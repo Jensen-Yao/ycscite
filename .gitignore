@@ -1,0 +1,45 @@
+# Build output and local reports
+/out/
+/out-*/
+/dist/
+/native/target/
+/diff/
+/driver/
+/driver_out/
+/ycscite-nine-figures/
+/ycscite-out-*/
+/ycscite-report/
+/examples/generated/
+*.log
+*.class
+*.jar
+*.zip
+*.sha256
+__pycache__/
+.playwright-cli/
+# Private historical experiments and reference data
+/HANDOFF.md
+/COVERAGE.md
+/CURRENT-WORK.md
+/PRODUCT-PLAN.md
+/REFERENCE-AUDIT.md
+/REFERENCE-INTEGRATION.md
+/ui-smoke.png
+/resources/jcr/*.csv
+/test/ycscite/BurstProbe.java
+*.csl-proj
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local application state if YCSCITE_DATA_HOME points at this checkout
+/workspace.json
+/workspace-recovery-*.json
+/workspace-*.new
+/history.json
+/history.new
+/imports/
+/reports/
+/webview/

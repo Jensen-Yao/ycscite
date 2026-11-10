@@ -1,0 +1,5 @@
+[
+  {"id":"inspect","method":"inspect","params":{"inputs":["demo-records.tsv"]}},
+  {"id":"network","method":"analyze","params":{"inputs":["demo-records.tsv"],"output":"generated/batch-network","settings":{"language":"en","image_scale":1,"charts":["network","thematic"]}}},
+  {"id":"collaboration","method":"analyze","params":{"inputs":["demo-records.tsv"],"output":"generated/batch-authors","settings":{"network":"author","image_scale":1,"charts":["network","circular"]}}}
+]

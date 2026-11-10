@@ -1,0 +1,9 @@
+{
+  "id": "demo",
+  "method": "analyze",
+  "params": {
+    "inputs": ["demo-records.tsv"],
+    "output": "generated/headless",
+    "settings": {"language":"en","image_scale":1,"charts":["timeline"],"logo":false}
+  }
+}

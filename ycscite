@@ -1,0 +1,12 @@
+#!/bin/sh
+# Ycscite launcher (GUI + CLI)
+DIR="$(cd "$(dirname "$0")" && pwd)"
+JAVA_CMD="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+command -v "$JAVA_CMD" >/dev/null 2>&1 || JAVA_CMD=java
+if [ $# -eq 0 ]; then
+  exec "$JAVA_CMD" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp "$DIR/out" ycscite.Main
+elif [ "$1" = "gui" ]; then
+  exec "$JAVA_CMD" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp "$DIR/out" ycscite.Main
+else
+  exec "$JAVA_CMD" -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp "$DIR/out" ycscite.Cli "$@"
+fi
