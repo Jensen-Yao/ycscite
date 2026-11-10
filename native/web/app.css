@@ -42,3 +42,8 @@ footer{background:#f3f0e8;color:#8b8171;font-size:11px;height:31px}.progress-car
 ::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#c9c0b1;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#aea28d}
 .command-bar #workspace-save-state{margin:0 12px 0 0;min-height:0;white-space:nowrap}
 @media(max-width:600px){.canvas:not(.zoomed)>img{inset:10px;width:calc(100% - 20px);height:calc(100% - 20px)}.command-bar #workspace-save-state{margin:2px 7px;font-size:10px}}
+
+/* Small scientific controls need readable contrast on warm surfaces. */
+:root{--muted:#696358}
+.muted,.small.muted,.header-sub,.view-heading p,.stats span,.metric-row,.view-explanation p,.import-zone>p,.import-preview,.path-settings,.quick-field,.run-panel p,.sidebar-bottom,.figure-item,.extra-view,.view-tabs button,.logo-toggle,.canvas-status,.canvas-status p,.node-row strong,.setting-field small,.empty-state p,footer,#settings-state,#workspace-save-state,#figure-number{color:#696358}
+.command-bar #workspace-save-state{font-size:11px}.import-zone>p{font-size:11px}#figure-number{font-size:10px}.view-tabs button.active{color:#4b4134}.figure-item.active{color:#8a402b}#workspace-save-state.save-error{color:#a34632}
