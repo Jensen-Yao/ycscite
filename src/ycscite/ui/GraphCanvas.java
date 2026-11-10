@@ -1160,7 +1160,7 @@ public final class GraphCanvas extends JPanel {
         if (mode == Mode.LANDSCAPE && network != null) { paintLandscape(g); return; }
         if (network == null || pos.isEmpty()) {
             // 空状态引导：居中三步提示
-            g.setColor(new Color(190, 190, 190));
+            g.setColor(theme==Theme.DARK?new Color(190,190,190):new Color(105,99,88));
             g.setFont(g.getFont().deriveFont(Font.PLAIN, 16f));
             var fm = g.getFontMetrics();
             String[] guide = {Strings.get("empty.1"), Strings.get("empty.2"), Strings.get("empty.3")};
@@ -1685,7 +1685,7 @@ public final class GraphCanvas extends JPanel {
         }
         int w = 250, x = getWidth() - w - 12, y = 30;
         int clusters = (int) network.nodeCollection().stream().mapToInt(n -> n.cluster).filter(c -> c >= 0).distinct().count();
-        int h = 34 + clusters * 16 + 46 + 44;
+        int h = 34 + Math.min(clusters,12) * 16 + 46 + 44 + (clusters>12?16:0);
         g.setColor(theme==Theme.DARK?new Color(20,20,20,205):new Color(250,249,245,238));
         g.fillRoundRect(x, y, w, h, 10, 10);
         g.setColor(theme==Theme.DARK?new Color(110,110,110):new Color(210,201,185));
@@ -1706,6 +1706,7 @@ public final class GraphCanvas extends JPanel {
             g.drawString(ycscite.I18n.text(lb.toString()), x + 26, yy);
             yy += 16;
         }
+        if(clusters>12){g.setColor(themeFg());g.drawString(Strings.isZh()?"另有 "+(clusters-12)+" 个聚类":"+ "+(clusters-12)+" more clusters",x+10,yy);yy+=16;}
         yy += 6;
         g.setColor(themeFg());
         g.setFont(g.getFont().deriveFont(Font.BOLD, 12f));
