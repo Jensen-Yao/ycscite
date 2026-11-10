@@ -57,7 +57,7 @@ native\target\release\ycscite.exe serve
 powershell -ExecutionPolicy Bypass -File tools/package-windows.ps1
 ```
 
-Linux/macOS 可用 `bash build.sh` 构建 Java 引擎，CLI/Web 模式通过 Cargo 构建；桌面 EXE 发布目标是 Windows x64。Linux/macOS 构建由 CI 检查，窗口行为以 Windows 实测为准。
+Linux/macOS 可用 `bash build.sh` 构建 Java 引擎，CLI/Web 模式通过 Cargo 构建；桌面 EXE 发布目标是 Windows x64。Linux 与 Windows 构建由 CI 检查；macOS 提供源码构建入口，尚未在本轮独立验证。窗口行为以 Windows 实测为准。
 
 项目结构：`src/ycscite` 分析与绘图引擎，`native` Rust CLI/本地服务/桌面窗口及 Web UI，`test` 回归用例，`examples` 可公开的合成文献，`docs` 方法与自动化文档。Rust 客户端与 Java 分析引擎共同组成当前应用，**尚非全 Rust 算法实现**。
 
