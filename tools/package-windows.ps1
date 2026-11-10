@@ -42,12 +42,33 @@ try {
     & $jarPath --create --file $engineJar -C $stageRoot ycscite -C $stageRoot ycscite-logo.png
     if($LASTEXITCODE -ne 0){throw 'JAR packaging failed'}
     $runtimeRoot=Join-Path $packageRoot 'runtime'
-    if(-not(Test-Path -LiteralPath $runtimeRoot)){
+    $runtimeModules=@('java.base','java.desktop','java.net.http','java.sql','java.xml','java.logging','jdk.crypto.ec','jdk.charsets','jdk.localedata','jdk.accessibility')
+    $runtimeJava=Join-Path $runtimeRoot 'bin\java.exe'
+    $runtimeComplete=$false
+    if(Test-Path -LiteralPath $runtimeJava){
+        $installedModules=@(& $runtimeJava --list-modules | ForEach-Object {($_ -split '@')[0]})
+        $runtimeComplete=($LASTEXITCODE -eq 0) -and -not($runtimeModules | Where-Object {$_ -notin $installedModules})
+    }
+    if(-not $runtimeComplete){
+        $nextRuntime=Join-Path $stageRoot 'runtime'
         $ErrorActionPreference='Continue'
-        & $jlinkPath --add-modules java.base,java.desktop,java.net.http,java.sql,java.xml,java.logging,jdk.crypto.ec,jdk.charsets,jdk.localedata --strip-debug --no-header-files --no-man-pages --compress=2 --output $runtimeRoot
+        & $jlinkPath --add-modules ($runtimeModules -join ',') --strip-debug --no-header-files --no-man-pages --compress=2 --output $nextRuntime
         $runtimeExit=$LASTEXITCODE
         $ErrorActionPreference='Stop'
         if($runtimeExit -ne 0){throw 'Runtime packaging failed'}
+        $resolvedStage=(Resolve-Path -LiteralPath $stageRoot).ProviderPath.TrimEnd('\')+'\'
+        $resolvedNext=(Resolve-Path -LiteralPath $nextRuntime).ProviderPath
+        $resolvedPackage=(Resolve-Path -LiteralPath $packageRoot).ProviderPath.TrimEnd('\')+'\'
+        $targetRuntime=[IO.Path]::GetFullPath($runtimeRoot)
+        if(-not $resolvedNext.StartsWith($resolvedStage,[StringComparison]::OrdinalIgnoreCase) -or -not $targetRuntime.StartsWith($resolvedPackage,[StringComparison]::OrdinalIgnoreCase)){throw 'Runtime staging paths are outside their expected directories'}
+        if(Test-Path -LiteralPath $runtimeRoot){
+            $resolvedRuntime=(Resolve-Path -LiteralPath $runtimeRoot).ProviderPath
+            $backupRuntime=[IO.Path]::GetFullPath((Join-Path $stageRoot 'previous-runtime'))
+            if(-not $resolvedRuntime.StartsWith($resolvedPackage,[StringComparison]::OrdinalIgnoreCase) -or -not $backupRuntime.StartsWith($resolvedStage,[StringComparison]::OrdinalIgnoreCase) -or (Get-Item -LiteralPath $runtimeRoot -Force).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)){throw 'Refusing to move a runtime outside the generated package'}
+            # Preserve the previous generated runtime in the owned staging folder.
+            Move-Item -LiteralPath $resolvedRuntime -Destination $backupRuntime
+        }
+        Move-Item -LiteralPath $resolvedNext -Destination $targetRuntime
     }
     Copy-Item -LiteralPath native\target\release\ycscite.exe -Destination (Join-Path $packageRoot 'ycscite-cli.exe') -Force
     Copy-Item -LiteralPath native\target\release\ycscite-desktop.exe -Destination (Join-Path $packageRoot 'Ycscite.exe') -Force

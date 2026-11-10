@@ -78,6 +78,7 @@ impl Workspace {
             "gexf",
             "ris",
             "records-tsv",
+            "project",
         ]
         .contains(&self.export_format.as_str())
         {

@@ -28,7 +28,7 @@ Ten network kinds: keyword/term co-occurrence, co-authorship, institution collab
 
 Selection supports g-index, Top-N, Top-N%; yearly or wider slices; exclusions and link thresholds; isolated-node and component choices. Pruning supports none, MST and Pathfinder. Similarity supports raw, cosine, Dice, Jaccard, inclusion and Equivalence. In this engine similarity denominators use incident raw edge-strength sums; Equivalence is `w_ij² / (s_i s_j)`, scaled and rounded to integer thousandths. It is an optional choice; default settings remain raw counts.
 
-Clustering: modularity optimization, spectral, EM. Labels: LLR, LSI, ISI keywords, TF-IDF, mutual information, k-core. Cluster membership and labels vary with selection, pruning, algorithm and source fields. Generic graph metrics include betweenness, PageRank, degree/eigenvector centrality, sigma and detected bursts. Audit node/edge/year tables accompany results.
+Clustering: modularity optimization, spectral, EM. Labels: LLR, LSI, ISI keywords, TF-IDF, mutual information, k-core. Cluster membership and labels vary with selection, pruning, algorithm and source fields. The six labeling algorithms apply to keyword/node source K; document sources T/A/WC/R/TKA currently use document-level LLR. Generic graph metrics include betweenness, PageRank, degree/eigenvector centrality, sigma and detected bursts. Audit node/edge/year tables accompany results. Weighted PageRank normalizes each positive edge by the incident weight sum, treats undirected edges in both directions and redistributes dangling mass uniformly. Its values are finite, nonnegative and sum to one; a global rescaling of all weights leaves the transition probabilities unchanged.
 
 ## Chart keys
 
@@ -76,3 +76,5 @@ Regression checks cover parsers, graph metrics on known small graphs, determinis
 Default sample comparisons continue to differ from the supplied reference in some nodes/edges, cluster composition and burst intervals. No claim of pixel-identical CiteSpace replication is made. LDA, BERTopic, calibrated forecasting, KBCA fusion, and full structural-variation reproduction remain potential independent extensions; they are not advertised as implemented modules.
 
 Reference concepts: Brandes betweenness; Kleinberg bursts; modularity community detection; Dunning likelihood-ratio labels; strategic thematic-map centrality/density. Optional reference-project ideas and deliberate limits are in `EXTENSIONS.md`.
+
+Editable projects preserve the included bibliographic records, full pipeline options (including selection, similarity, exclusions and burst controls), all stored network metrics, clustering, labels, burst rows, parameter metadata, manual annotations, bookmarks and renamed labels. Opening a matching report in the advanced editor restores the analyzed network; it does not silently switch to the editor's Top-N defaults. The legacy file identifier remains readable with additive fields for backward compatibility.

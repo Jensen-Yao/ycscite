@@ -20,7 +20,7 @@ Results default to the local Ycscite data directory (`%LOCALAPPDATA%/Ycscite` on
 - t-SNE and approximate UMAP are exploratory graph layouts. Perplexity, iteration counts and seed are configurable; distances do not establish semantic similarity.
 - Journal citation flows use actual parsable journals, with coverage reported. Keywords never stand in for missing cited journals. This is not a JCR disciplinary dual-map overlay.
 - Switching language updates the interface. Regenerate figures for translated titles and axes; bibliographic content remains in its original language.
-- The advanced editor opens a separate window for manual node editing and traditional analysis menus; save/export there separately.
+- The advanced editor restores the current editable project when available, or analyzes the inputs using the current settings. Save manual node edits, bookmarks and annotations as a project there; existing report figures are retained.
 - Stopping a run terminates its analysis child. Partial files can remain but are not marked as a complete result.
 
 ## Workspace recovery and provenance
@@ -30,3 +30,13 @@ Language, settings, input paths, output location, active view, chart/data tab, s
 `workspace.json` is private application state containing local paths; use the separate settings JSON for CLI/headless. The default folder is `%LOCALAPPDATA%/Ycscite` on Windows, `$XDG_DATA_HOME/Ycscite` or `~/.local/share/Ycscite` on Linux, and `~/Library/Application Support/Ycscite` on macOS. `YCSCITE_DATA_HOME` overrides it. Corrupt state receives a recovery copy; report files are retained.
 
 On import/reopen, the app checks parsed record identity. Editing a file in place marks old figures as historical until regenerated. Reports predating identity tracking are explicitly marked as unverified historical results. Their images remain available for viewing and export.
+
+## Reusable editable results
+
+Choose **Editable project** in the export selector to download the current view's network as `.csl-proj`. Reports keep separate files under `projects/`, with links on the offline report page. Projects include the analyzed nodes/links, metrics, clusters, labels, complete pipeline options and the included source records. They can be reopened without the original input directory. Manual annotations, bookmarks and renamed labels survive a save/reload and an editor language switch. Rerunning reconstructs the network, so save manual edits separately first.
+
+Projects contain included records, rather than the full unfiltered corpus. Keep original exports when you need to change the year range or restore excluded records. `source_fingerprint` identifies the original parsed corpus; `analysis_fingerprint` identifies the included records.
+
+New `records.tsv` exports use a version marker and JSON string arrays for multivalue fields, preserving embedded semicolons, control characters and spacing. The older 17-column format remains readable.
+
+Label source K uses the selected labeling algorithm. Other document sources (T/A/WC/R/TKA) currently use document-level LLR; the algorithm and source selectors do not imply arbitrary combinations are all implemented.

@@ -6,7 +6,9 @@ import ycscite.ui.MainFrame;
 
 import javax.swing.*;
 import java.awt.Graphics2D;
-import java.awt.Robot;
+import ycscite.io.ProjectStore;
+import ycscite.io.NineFigureReport;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 
@@ -22,11 +24,19 @@ public final class Main {
         try {
             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels())
                 if ("Nimbus".equals(info.getName())) {
+                    UIManager.put("control",new java.awt.Color(248,245,238));
+                    UIManager.put("nimbusBase",new java.awt.Color(209,199,181));
+                    UIManager.put("nimbusBlueGrey",new java.awt.Color(227,220,205));
+                    UIManager.put("nimbusFocus",new java.awt.Color(174,89,61));
+                    UIManager.put("nimbusSelectionBackground",new java.awt.Color(174,89,61));
+                    UIManager.put("text",new java.awt.Color(48,46,41));
                     UIManager.setLookAndFeel(info.getClassName());
                     // 统一控件圆角与间距
-                    UIManager.put("Panel.background", new java.awt.Color(245, 245, 248));
+                    UIManager.put("Panel.background", new java.awt.Color(250, 249, 245));
                     UIManager.put("TabbedPane.contentOpaque", true);
                     UIManager.put("Slider.paintValue", false);
+                    var uiFont=new javax.swing.plaf.FontUIResource(java.awt.Font.SANS_SERIF,java.awt.Font.PLAIN,13);
+                    UIManager.put("defaultFont",uiFont);for(Object key:java.util.Collections.list(UIManager.getLookAndFeelDefaults().keys()))if(key.toString().endsWith(".font"))UIManager.put(key,uiFont);
                     break;
                 }
         } catch (Exception ignored) { }
@@ -59,13 +69,27 @@ public final class Main {
             return;
         }
         boolean demo = Arrays.stream(args).anyMatch(a -> a.equals("--demo"));
-        var initialInputs=new java.util.ArrayList<String>();String language="zh";
+        var initialInputs=new java.util.ArrayList<String>();String language=null;Path config=null,projectFile=null,smokeOutput=null;
         for(int i=0;i<args.length;i++){
-            if(args[i].equals("--input")&&i+1<args.length)initialInputs.add(args[++i]);
-            else if(args[i].equals("--lang")&&i+1<args.length)language=args[++i];
+            switch(args[i]){
+                case "--input"->{if(++i==args.length)throw new IllegalArgumentException("--input needs a path");initialInputs.add(args[i]);}
+                case "--lang"->{if(++i==args.length)throw new IllegalArgumentException("--lang needs zh or en");language=args[i];}
+                case "--config"->{if(++i==args.length)throw new IllegalArgumentException("--config needs a file");config=Path.of(args[i]);}
+                case "--project"->{if(++i==args.length)throw new IllegalArgumentException("--project needs a file");projectFile=Path.of(args[i]);}
+                case "--smoke-output"->{if(++i==args.length)throw new IllegalArgumentException("--smoke-output needs a directory");smokeOutput=Path.of(args[i]);}
+                case "--demo"->{}
+                default->throw new IllegalArgumentException("Unknown argument: "+args[i]);
+            }
         }
-        ycscite.ui.Strings.setLang(language.equals("en")?ycscite.ui.Strings.Lang.EN:ycscite.ui.Strings.Lang.ZH);
-        Project initial=initialInputs.isEmpty()?null:Cli.loadReportInputs(initialInputs);
+        if(projectFile!=null&&(!initialInputs.isEmpty()||config!=null||demo))throw new IllegalArgumentException("--project cannot be combined with input, config or demo");
+        final Settings startupSettings=config==null?null:Settings.read(config);
+        String chosenLanguage=language!=null?language:startupSettings!=null?startupSettings.text("language"):"zh";
+        if(!java.util.Set.of("zh","en").contains(chosenLanguage))throw new IllegalArgumentException("Language must be zh or en");
+        ycscite.ui.Strings.setLang(chosenLanguage.equals("en")?ycscite.ui.Strings.Lang.EN:ycscite.ui.Strings.Lang.ZH);
+        final ProjectStore.Bundle startupBundle=projectFile==null?null:ProjectStore.load(projectFile);
+        Project loaded=initialInputs.isEmpty()?(demo?DemoData.generate(120):null):Cli.loadInputs(initialInputs,startupSettings==null?"auto":startupSettings.text("format"));
+        final Project initial=loaded!=null&&startupSettings!=null?NineFigureReport.prepare(loaded,startupSettings).project():loaded;
+        final Path diagnostics=smokeOutput;
         // 启动画面（闪屏 1.2 秒）
         JWindow splash = new JWindow();
         splash.setSize(420, 260);
@@ -91,7 +115,7 @@ public final class Main {
                 g.drawString(sub, (getWidth() - fm.stringWidth(sub)) / 2, 140);
                 g.setColor(new java.awt.Color(80, 90, 110));
                 g.setFont(g.getFont().deriveFont(java.awt.Font.PLAIN, 10f));
-                String ver = "v0.3.0 · Java 21";
+                String ver = "v"+Cli.VERSION+" · Java 21";
                 fm = g.getFontMetrics();
                 g.drawString(ver, (getWidth() - fm.stringWidth(ver)) / 2, 170);
                 // 进度条
@@ -108,13 +132,17 @@ public final class Main {
         timer.setRepeats(false);
         timer.start();
         SwingUtilities.invokeLater(() -> {
-            MainFrame f = new MainFrame();
-            f.setVisible(true);
-            if(initial!=null){f.setProject(initial);f.runPipeline();}
-            else if (demo) {
-                f.setProject(DemoData.generate(120));
-                f.runPipeline();
-            }
+            MainFrame frame=new MainFrame();
+            if(startupBundle!=null)frame.setBundle(startupBundle);
+            else {if(initial!=null)frame.setProject(initial);if(startupSettings!=null)frame.applySettings(startupSettings);if(initial!=null)frame.runPipeline();}
+            frame.setVisible(true);
+            if(diagnostics!=null){var capture=new javax.swing.Timer(100,event->{if(frame.isRendering())return;((javax.swing.Timer)event.getSource()).stop();try{
+                if(frame.renderFailure()!=null)throw new IllegalStateException("Editor layout failed",frame.renderFailure());
+                Files.createDirectories(diagnostics);
+                var image=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);
+                var graphics=image.createGraphics();frame.paint(graphics);graphics.dispose();javax.imageio.ImageIO.write(image,"png",diagnostics.resolve("editor.png").toFile());
+                frame.saveDiagnostics(diagnostics);frame.dispose();System.exit(0);
+            }catch(Exception error){error.printStackTrace();frame.dispose();System.exit(1);}});capture.start();}
         });
     }
 }

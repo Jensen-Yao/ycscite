@@ -40,6 +40,8 @@ public final class Project {
         if (removed > 0) {
             records.clear();
             records.addAll(kept);
+            minYear=Integer.MAX_VALUE;maxYear=Integer.MIN_VALUE;
+            for(var record:records)if(record.year>0){minYear=Math.min(minYear,record.year);maxYear=Math.max(maxYear,record.year);}
         }
         return removed;
     }

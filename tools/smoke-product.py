@@ -54,6 +54,15 @@ def main():
         assert b"/Count 18" in (out / "report.pdf").read_bytes()
         assert all((out / "data" / name).is_file() for name in manifest["data_files"])
         assert all((out / item["file"]).is_file() for item in manifest["artifacts"])
+        for editable in manifest["project_files"]:
+            state=json.loads((out/editable["file"]).read_text(encoding="utf-8"))
+            stats=next(n for n in manifest["networks"] if n["kind"]==editable["kind"])
+            assert len(state["analysis"]["nodes"])==stats["nodes"] and len(state["analysis"]["edges"])==stats["edges"]
+            assert state["analysis"]["modularity"]==stats["modularity"]
+        record_copy=out/"records.tsv"
+        again=json.loads(run(["inspect",record_copy,"--json"]).stdout)["result"]
+        assert again["source_fingerprint"]==manifest["analysis_fingerprint"]
+
         requests = [
             '{"id":9007199254740993,"method":"capabilities"}',
             '{broken',
@@ -79,7 +88,7 @@ def main():
         run(["report", work / "missing.txt", "--json"], expected=1)
         print(json.dumps({"ok":True,"charts":18,"formats":13,"records":72,
                           "checks":["unrelated-cwd", "config", "all-charts", "all-analysis-tables", "all-exports",
-                                    "logo-variants", "pdf-pages", "ndjson-framing", "integer-id", "error-recovery",
+                                    "logo-variants", "pdf-pages", "editable-projects", "lossless-records-tsv", "ndjson-framing", "integer-id", "error-recovery",
                                     "batch-isolation", "request-relative-paths", "exit-codes"]}, ensure_ascii=False))
 
 

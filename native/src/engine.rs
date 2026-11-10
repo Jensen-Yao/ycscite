@@ -86,22 +86,65 @@ impl Engine {
         cmd
     }
 
-    pub fn workbench(&self, inputs: Vec<PathBuf>, language: &str) -> Result<u32, String> {
-        let mut cmd = Command::new(&self.java);
-        cmd.args(["-Dfile.encoding=UTF-8", "-Djava.awt.headless=false", "-cp"])
+    pub fn workbench(
+        &self,
+        inputs: Vec<PathBuf>,
+        language: Option<&str>,
+        config: Option<PathBuf>,
+        project: Option<PathBuf>,
+    ) -> Result<u32, String> {
+        if project.is_some() && (!inputs.is_empty() || config.is_some()) {
+            return Err("A saved project cannot be combined with input/config".into());
+        }
+        if let Some(path) = &config {
+            let settings: Value =
+                serde_json::from_slice(&fs::read(path).map_err(|e| e.to_string())?)
+                    .map_err(|e| e.to_string())?;
+            let validated = self.request(
+                json!({"id":1,"method":"validate_settings","params":{"settings":settings}}),
+            )?;
+            if validated["ok"] != true {
+                return Err(validated["error"]["message"]
+                    .as_str()
+                    .unwrap_or("Invalid settings")
+                    .into());
+            }
+        }
+        if let Some(path) = &project {
+            if !path.is_file() {
+                return Err("Project file does not exist".into());
+            }
+        }
+        let mut command = Command::new(&self.java);
+        command
+            .args([
+                "-Dfile.encoding=UTF-8",
+                "-Dstdout.encoding=UTF-8",
+                "-Dstderr.encoding=UTF-8",
+                "-Djava.awt.headless=false",
+                "-cp",
+            ])
             .arg(&self.classpath)
-            .arg("ycscite.Main")
-            .arg("--lang")
-            .arg(language);
+            .arg("ycscite.Main");
+        if let Some(language) = language {
+            command.arg("--lang").arg(language);
+        }
+        if let Some(path) = config {
+            command.arg("--config").arg(absolute(&path)?);
+        }
+        if let Some(path) = project {
+            command.arg("--project").arg(absolute(&path)?);
+        }
         for input in inputs {
-            cmd.arg("--input").arg(input);
+            command.arg("--input").arg(absolute(&input)?);
         }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x08000000);
+            command.creation_flags(0x08000000);
         }
-        cmd.spawn()
+        command
+            .spawn()
             .map(|child| child.id())
             .map_err(|e| e.to_string())
     }

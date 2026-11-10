@@ -5,7 +5,9 @@ import ycscite.model.Network;
 
 import java.util.List;
 
-/** PageRank on the undirected network (edges treated both ways), damping 0.85, values sum to 1. */
+/** Weighted PageRank on the undirected network; each positive edge is traversable both ways.
+ * Transition weights are divided by incident weight sum (not edge count). Damping .85; sum is 1.
+ */
 public final class PageRank {
 
     public static void compute(Network g) {
@@ -21,22 +23,22 @@ public final class PageRank {
         java.util.Map<GraphNode, Integer> idx = new java.util.HashMap<>();
         for (int i = 0; i < n; i++) { idx.put(nodes.get(i), i); pr[i] = 1.0 / n; }
 
-        int[] deg = new int[n];
+        if(!Double.isFinite(damping)||damping<0||damping>1||!Double.isFinite(eps)||eps<=0||maxIter<=0)throw new IllegalArgumentException("Invalid PageRank convergence parameters");
+        double[] strength = new double[n];
         for (var e : g.edges) {
             Integer a = idx.get(e.a), b = idx.get(e.b);
-            if (a != null && b != null && !a.equals(b)) { deg[a]++; deg[b]++; }
-            else if (a != null) deg[a]++; // self-loop-ish safety
+            if (a != null && b != null && !a.equals(b) && e.weight>0) { strength[a]+=e.weight;strength[b]+=e.weight; }
         }
         for (int it = 0; it < maxIter; it++) {
             java.util.Arrays.fill(next, 0);
             double dangling = 0;
-            for (int i = 0; i < n; i++) if (deg[i] == 0) dangling += pr[i];
+            for (int i = 0; i < n; i++) if (strength[i] == 0) dangling += pr[i];
             for (var e : g.edges) {
                 Integer ai = idx.get(e.a), bi = idx.get(e.b);
-                if (ai == null || bi == null || ai.equals(bi)) continue;
+                if (ai == null || bi == null || ai.equals(bi) || e.weight<=0) continue;
                 int w = e.weight;
-                next[ai] += pr[bi] * w / deg[bi];
-                next[bi] += pr[ai] * w / deg[ai];
+                next[ai] += pr[bi] * (w / strength[bi]);
+                next[bi] += pr[ai] * (w / strength[ai]);
             }
             double base = (1 - damping) / n + damping * dangling / n;
             double diff = 0;

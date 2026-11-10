@@ -114,6 +114,8 @@ public final class Network {
             c.halfLife = n.halfLife;
             c.centrality = n.centrality;
             c.pageRank = n.pageRank;
+            c.degreeCentrality=n.degreeCentrality;c.eigenCentrality=n.eigenCentrality;
+            c.bookmarked=n.bookmarked;c.annotation=n.annotation;c.userLabel=n.userLabel;
             c.burstness = n.burstness;
             c.burstStrength = n.burstStrength;
             c.sigma = n.sigma;

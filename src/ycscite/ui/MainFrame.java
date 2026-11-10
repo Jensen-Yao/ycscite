@@ -38,11 +38,12 @@ public final class MainFrame extends JFrame {
 
     private Project project;
     private Pipeline.Result result;
+    private Pipeline.Options inheritedOptions=new Pipeline.Options();
     private final JComboBox<String> networkKind = new JComboBox<>();
     private final JComboBox<String> clusterAlgo = new JComboBox<>();
     private final JComboBox<String> labelAlgo = new JComboBox<>();
     private final JComboBox<String> labelSource = new JComboBox<>();
-    private final JSpinner topN = new JSpinner(new SpinnerNumberModel(50, 0, 5000, 10));
+    private final JSpinner topN = new JSpinner(new SpinnerNumberModel(50, 0, 100000, 10));
     private final JSlider labelSlider = new JSlider(0, 150, 30);
     private final JComboBox<String> sizeMode = new JComboBox<>();
     private final JTextField search = new JTextField(12);
@@ -77,27 +78,28 @@ public final class MainFrame extends JFrame {
     private final JTabbedPane tabs = new JTabbedPane();
     private final AnimationBar anim = new AnimationBar(this::currentCanvas);
     // 新增选项控件：时间范围 / 片长 / 每片 Top N / 剪枝 / 最小聚类
-    private final JSpinner fromYear = new JSpinner(new SpinnerNumberModel(2000, 1900, 2999, 1));
-    private final JSpinner toYear = new JSpinner(new SpinnerNumberModel(2030, 1900, 2999, 1));
-    private final JSpinner sliceYears = new JSpinner(new SpinnerNumberModel(1, 1, 20, 1));
-    private final JSpinner topPerSlice = new JSpinner(new SpinnerNumberModel(0, 0, 500, 5));
+    private final JSpinner fromYear = new JSpinner(new SpinnerNumberModel(2000, 0, 3000, 1));
+    private final JSpinner toYear = new JSpinner(new SpinnerNumberModel(2030, 0, 9999, 1));
+    private final JSpinner sliceYears = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+    private final JSpinner topPerSlice = new JSpinner(new SpinnerNumberModel(0, 0, 100000, 5));
     private final JComboBox<String> pruningBox = new JComboBox<>();
     private final JComboBox<String> layoutAlgo = new JComboBox<>();
     private final JComboBox<String> colorPreset = new JComboBox<>(); // 配色方案（原版 ph:1471-1483）
     private final JComboBox<String> selectionBox = new JComboBox<>();
-    private final JSpinner gindexK = new JSpinner(new SpinnerNumberModel(1.0, 0.1, 10.0, 0.1));
-    private final JSpinner minLinkStrength = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
-    private final JSpinner largestCC = new JSpinner(new SpinnerNumberModel(0, 0, 50, 1));
+    private final JSpinner gindexK = new JSpinner(new SpinnerNumberModel(1.0, 0.1, 10000.0, 1.0));
+    private final JSpinner minLinkStrength = new JSpinner(new SpinnerNumberModel(1, 1, 10000, 1));
+    private final JSpinner largestCC = new JSpinner(new SpinnerNumberModel(0, 0, 100000, 1));
     private final JCheckBox singularCheck = new JCheckBox(Strings.get("singular"));
-    private final JSpinner minCluster = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+    private final JSpinner minCluster = new JSpinner(new SpinnerNumberModel(1, 1, 10000, 1));
     // 右侧信息面板 / 状态栏 / 撤销栈
     private final InfoPanels.NodeInfoPanel nodeInfo = new InfoPanels.NodeInfoPanel();
     private final InfoPanels.ClusterPanel clusterPanel = new InfoPanels.ClusterPanel(c -> currentCanvas().highlightCluster(c));
     private final JLabel status = new JLabel(Strings.get("status.ready"));
-    private final java.util.Deque<ycscite.model.Network> undoStack = new java.util.ArrayDeque<>();
+    private final java.util.Deque<Pipeline.Result> undoStack = new java.util.ArrayDeque<>();
 
     public MainFrame() {
-        super(Strings.get("app.title"));
+        super("Ycscite "+ycscite.Cli.VERSION+" · "+Strings.get("app.title"));
+        for(GraphCanvas canvas:new GraphCanvas[]{timeline,timezone,merged,tsne,circular,heatmap,landscape,umap,circlePack})canvas.setTheme(GraphCanvas.Theme.LIGHT);
         var logo = MainFrame.class.getResource("/ycscite-logo.png");
         if (logo != null) setIconImage(new javax.swing.ImageIcon(logo).getImage());
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -114,6 +116,7 @@ public final class MainFrame extends JFrame {
         tabs.addTab(Strings.get("view.landscape"), landscape);
         tabs.addTab(Strings.get("view.umap"), umap);
         tabs.addTab(Strings.get("view.circlepack"), circlePack);
+        tabs.setSelectedComponent(merged);
 
         // 右侧：节点信息 / 聚类列表
         JTabbedPane east = new JTabbedPane();
@@ -198,8 +201,8 @@ public final class MainFrame extends JFrame {
         im.put(javax.swing.KeyStroke.getKeyStroke("F1"), "help");
         am.put("help", new AbstractAction() { @Override public void actionPerformed(java.awt.event.ActionEvent e) {
             JOptionPane.showMessageDialog(MainFrame.this,
-                "Ycscite 快捷键:\n  Ctrl+O  打开项目\n  Ctrl+S  保存项目\n  Ctrl+Z  撤销编辑\n  Ctrl+D  切换暗/亮主题\n  Ctrl+E  导出 PNG\n  Ctrl+Shift+E  导出 Pajek\n  Ctrl+B  导出 TSV\n  F5     运行分析\n  F1     帮助",
-                "帮助", JOptionPane.INFORMATION_MESSAGE);
+                Strings.isZh()?"Ycscite 快捷键:\n  Ctrl+O  打开项目\n  Ctrl+S  保存项目\n  Ctrl+Z  撤销编辑\n  Ctrl+D  切换暗/亮主题\n  Ctrl+E  导出 PNG\n  Ctrl+Shift+E  导出 Pajek\n  Ctrl+B  导出 TSV\n  F5     运行分析\n  F1     帮助":"Ycscite shortcuts:\n  Ctrl+O  Open project\n  Ctrl+S  Save project\n  Ctrl+Z  Undo edit\n  Ctrl+D  Toggle theme\n  Ctrl+E  Export PNG\n  Ctrl+Shift+E  Export Pajek\n  Ctrl+B  Export TSV\n  F5  Run analysis\n  F1  Help",
+                Strings.isZh()?"帮助":"Help", JOptionPane.INFORMATION_MESSAGE);
         } });
     }
 
@@ -210,9 +213,9 @@ public final class MainFrame extends JFrame {
             return;
         }
         if (result == null) return;
-        result.network = undoStack.pop();
+        result = undoStack.pop();
         refresh(project == null ? "network" : project.name + " — " + result.network.kind + " (undo)");
-        setStatus(Strings.get("undo") + " ✓  剩余 " + undoStack.size() + " 步");
+        setStatus(Strings.get("undo") + (Strings.isZh()?" ✓  剩余 ":" ✓  Remaining: ") + undoStack.size() + (Strings.isZh()?" 步":" steps"));
     }
 
     void setStatus(String s) { status.setText(s); }
@@ -279,10 +282,10 @@ public final class MainFrame extends JFrame {
         lang.add(zh);
         lang.add(en);
         view.add(lang);
-        JMenu themeMenu = new JMenu("主题");
-        JMenuItem dark = new JMenuItem("暗色");
-        JMenuItem light = new JMenuItem("亮色");
-        JMenuItem sepia = new JMenuItem("羊皮纸");
+        JMenu themeMenu = new JMenu(Strings.isZh()?"主题":"Theme");
+        JMenuItem dark = new JMenuItem(Strings.isZh()?"暗色":"Dark");
+        JMenuItem light = new JMenuItem(Strings.isZh()?"亮色":"Light");
+        JMenuItem sepia = new JMenuItem(Strings.isZh()?"羊皮纸":"Sepia");
         dark.addActionListener(e -> setTheme(GraphCanvas.Theme.DARK));
         light.addActionListener(e -> setTheme(GraphCanvas.Theme.LIGHT));
         sepia.addActionListener(e -> setTheme(GraphCanvas.Theme.SEPIA));
@@ -292,7 +295,7 @@ public final class MainFrame extends JFrame {
         view.add(lang);
         mb.add(file);
         mb.add(view);
-        JMenu tools = new JMenu("外部工具");
+        JMenu tools = new JMenu(Strings.isZh()?"外部工具":"External tools");
         addUrlItem(tools, "HistCite", "https://histcite.sciencewebresearch.net/");
         addUrlItem(tools, "Leydesdorff Toolset", "https://www.leydesdorff.net/");
         addUrlItem(tools, "NWB", "https://nwb.cns.iu.edu/");
@@ -302,15 +305,15 @@ public final class MainFrame extends JFrame {
         addUrlItem(tools, "SCI2", "https://sci2.cns.iu.edu/");
         addUrlItem(tools, "CiteSpace 101", "https://cpo.ciid.cmu.edu/citespace/");
         mb.add(tools);
-        JMenu helpM = new JMenu("帮助");
+        JMenu helpM = new JMenu(Strings.isZh()?"帮助":"Help");
         addUrlItem(helpM, "How to Use", "https://cpo.ciid.cmu.edu/citespace/how-to-use/");
         addUrlItem(helpM, "FAQ", "https://cpo.ciid.cmu.edu/citespace/faq/");
         addUrlItem(helpM, "Video Tutorials", "https://www.youtube.com/playlist?list=PLpEDzH9MgGDS4q6hGfVWFcVbS2B6SCrBv");
         addUrlItem(helpM, "Twitter", "https://twitter.com/citespace");
         addUrlItem(helpM, "ResearchGate", "https://www.researchgate.net/project/CiteSpace");
-        JMenuItem about = new JMenuItem("关于 Ycscite");
+        JMenuItem about = new JMenuItem(Strings.isZh()?"关于 Ycscite":"About Ycscite");
         about.addActionListener(e -> JOptionPane.showMessageDialog(this,
-                "Ycscite 1.0\nCiteSpace 全功能复刻\n29 轮迭代 · 282 断言 · 199/199 可实现项"));
+                "Ycscite "+ycscite.Cli.VERSION+"\n"+(Strings.isZh()?"文献计量与知识图谱分析\n高级窗口可编辑当前网络；方法定义与限制见使用文档。":"Bibliometric and knowledge-network analysis\nEdit the current network here; see the user guide for method definitions and limitations.")));
         helpM.addSeparator();
         helpM.add(about);
         mb.add(helpM);
@@ -333,22 +336,11 @@ public final class MainFrame extends JFrame {
     }
 
     /** 语言切换：静态语言位 + 重建窗口（保留当前数据与结果）。 */
-    private void relaunch(Strings.Lang l) {
-        if (Strings.getLang() == l) return;
-        Strings.setLang(l);
-        Project p = this.project;
-        Pipeline.Result r = this.result;
-        String netKind = (String) networkKind.getSelectedItem();
-        String algo = (String) clusterAlgo.getSelectedItem();
-        SwingUtilities.invokeLater(() -> {
-            MainFrame f = new MainFrame();
-            f.project = p;
-            if (netKind != null) f.networkKind.setSelectedItem(translateNetKind(netKind));
-            if (algo != null) f.clusterAlgo.setSelectedItem(translateAlgo(algo));
-            f.setVisible(true);
-            if (p != null && r != null) f.runPipeline();
-            dispose();
-        });
+    private void relaunch(Strings.Lang language) {
+        if(Strings.getLang()==language)return;
+        var bundle=new ProjectStore.Bundle();bundle.project=project;bundle.result=result;bundle.options=currentOptions();
+        Strings.setLang(language);
+        SwingUtilities.invokeLater(()->{var frame=new MainFrame();if(bundle.project!=null)frame.setBundle(bundle);frame.setVisible(true);dispose();});
     }
 
     private String translateNetKind(String old) {
@@ -515,9 +507,9 @@ public final class MainFrame extends JFrame {
         an.add(label(Strings.get("cluster.algo")));
         clusterAlgo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
         an.add(clusterAlgo);
-        an.add(label("布局算法:"));
+        an.add(label(Strings.isZh()?"布局算法:":"Layout:"));
         an.add(layoutAlgo);
-        an.add(label("配色方案:"));
+        an.add(label(Strings.isZh()?"配色方案:":"Palette:"));
         an.add(colorPreset);
         an.add(label(Strings.get("label.algo")));
         labelAlgo.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
@@ -842,7 +834,7 @@ public final class MainFrame extends JFrame {
             labels.removeIf(String::isBlank);
             for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
                 c.setHighlightList(labels);
-            setStatus("高亮列表: " + labels.size() + " 项");
+            setStatus((Strings.isZh()?"高亮列表: ":"Highlight list: ") + labels.size());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("dialog.fail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -921,7 +913,7 @@ public final class MainFrame extends JFrame {
             return;
         }
         if (result != null) {
-            undoStack.push(result.network.deepCopy());
+            undoStack.push(ProjectStore.copyAnalysis(result));
             int merged = ycscite.analysis.RefVariants.merge(result.network);
             int slices = project == null ? 0 : Math.max(0, project.maxYear - project.minYear + 1);
             result = Pipeline.reanalyze(result.network, currentOptions(), slices);
@@ -1021,8 +1013,41 @@ public final class MainFrame extends JFrame {
         }
     }
 
-    public void setProject(Project p) { this.project = p; }
+    public void setProject(Project p) { this.project = p;spanInitialized=false; }
 
+    /** Restore the analyzed project as-is; editing starts from the report's nodes and options. */
+    public void setBundle(ProjectStore.Bundle bundle) {
+        this.project=bundle.project;syncOptions(bundle.options);
+        if(bundle.result!=null){this.result=bundle.result;undoStack.clear();refresh(project.name+" — "+(Strings.isZh()?netKindZh(result.network.kind):result.network.kind));}
+        else runPipeline();
+    }
+    public void applySettings(ycscite.Settings settings) {
+        syncOptions(settings.pipeline(null));
+        labelSlider.setValue(settings.integer("label_budget"));
+        fontSpin.setValue((int)Math.clamp(12*settings.number("label_scale"),6,24));
+        for(GraphCanvas canvas:new GraphCanvas[]{timeline,timezone,merged,tsne,circular,heatmap,landscape,umap,circlePack}){
+            canvas.setTheme(GraphCanvas.Theme.LIGHT);canvas.setNodeScale(settings.number("node_scale"));canvas.setLabelBudget(settings.integer("label_budget"));
+            canvas.setLabelFontSize((float)(12*settings.number("label_scale")));canvas.setLinkTransparency((float)settings.number("link_opacity"));
+        }
+    }
+    /** Reproducible diagnostics for the interactive editor, also used by its UI smoke mode. */
+    public Map<String,Object> analysisState() {
+        var state=new java.util.LinkedHashMap<String,Object>();state.put("options",ycscite.io.PipelineOptionsCodec.write(currentOptions()));
+        if(project!=null){state.put("source_fingerprint",ycscite.io.DataFingerprint.of(project));state.put("records",project.records.size());}
+        if(result!=null){state.put("nodes",result.network.nodes.size());state.put("edges",result.network.edges.size());state.put("modularity",result.modularity);}
+        return state;
+    }
+
+    public void saveDiagnostics(Path folder)throws java.io.IOException{
+        java.nio.file.Files.writeString(folder.resolve("state.json"),ycscite.io.MiniJson.write(analysisState()));
+        if(project!=null)ProjectStore.save(folder.resolve("analysis.csl-proj"),project,result,currentOptions());
+        if(result!=null)Exporters.writeTables(result.network,result.clusterLabels,folder.resolve("nodes.tsv"),folder.resolve("edges.tsv"));
+    }
+
+    private boolean rendering=false;
+    private Throwable renderFailure=null;
+    public boolean isRendering(){return rendering;}
+    public Throwable renderFailure(){return renderFailure;}
     private boolean spanInitialized = false;
 
     public void runPipeline() {
@@ -1049,7 +1074,7 @@ public final class MainFrame extends JFrame {
     }
 
     private Pipeline.Options currentOptions() {
-        Pipeline.Options o = new Pipeline.Options();
+        Pipeline.Options o = ycscite.io.PipelineOptionsCodec.copy(inheritedOptions);
         o.networkKind = netKindKey((String) networkKind.getSelectedItem());
         o.topN = (Integer) topN.getValue();
         o.fromYear = (Integer) fromYear.getValue();
@@ -1074,14 +1099,15 @@ public final class MainFrame extends JFrame {
                 ? ycscite.analysis.Labelers.ISI_KW
                 : labSel != null && labSel.contains("TF-IDF")
                 ? ycscite.analysis.Labelers.TFIDF
+                : labSel != null && (labSel.equals(Strings.get("label.mi"))||labSel.equalsIgnoreCase("mi")) ? ycscite.analysis.Labelers.MI
+                : labSel != null && (labSel.equals(Strings.get("label.kcore"))||labSel.equalsIgnoreCase("kcore")) ? ycscite.analysis.Labelers.KCORE
                 : ycscite.analysis.Labelers.LLR;
         String srcSel = (String) labelSource.getSelectedItem();
-        o.labelSource = srcSel == null || srcSel.contains("(K)") || srcSel.contains("Keywords") ? ycscite.analysis.Labelers.SRC_K
-                : srcSel.contains("(T)") || srcSel.contains("Titles (T)") ? ycscite.analysis.Labelers.SRC_T
-                : srcSel.contains("(A)") || srcSel.contains("Abstracts") ? ycscite.analysis.Labelers.SRC_A
-                : srcSel.contains("WC") || srcSel.contains("Fields") ? ycscite.analysis.Labelers.SRC_WC
-                : srcSel.contains("(R)") || srcSel.contains("Reference") ? ycscite.analysis.Labelers.SRC_R
-                : ycscite.analysis.Labelers.SRC_TKA;
+        o.labelSource=Strings.get("src.t").equals(srcSel)?ycscite.analysis.Labelers.SRC_T
+                :Strings.get("src.a").equals(srcSel)?ycscite.analysis.Labelers.SRC_A
+                :Strings.get("src.wc").equals(srcSel)?ycscite.analysis.Labelers.SRC_WC
+                :Strings.get("src.r").equals(srcSel)?ycscite.analysis.Labelers.SRC_R
+                :Strings.get("src.tka").equals(srcSel)?ycscite.analysis.Labelers.SRC_TKA:ycscite.analysis.Labelers.SRC_K;
         String selSel = (String) selectionBox.getSelectedItem();
         o.selection = selSel == null ? Pipeline.TOP_N
                 : selSel.contains("g-index") || selSel.contains("gindex") ? Pipeline.G_INDEX
@@ -1104,7 +1130,7 @@ public final class MainFrame extends JFrame {
 
     private void refresh(String t) {
         // 布局（LinLog 5000 迭代等）在后台线程执行，避免冻结 EDT（审计 P0-2）
-        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));
+        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));rendering=true;renderFailure=null;
         final ycscite.analysis.Pipeline.Result res = result;
         javax.swing.SwingWorker<Void, Void> worker = new javax.swing.SwingWorker<>() {
             @Override
@@ -1124,13 +1150,15 @@ public final class MainFrame extends JFrame {
 
             @Override
             protected void done() {
+                if(res!=result)return;
+                try{get();}catch(Exception error){renderFailure=error;rendering=false;setStatus(Strings.isZh()?"布局失败，请检查参数":"Layout failed; review settings");setCursor(java.awt.Cursor.getDefaultCursor());return;}
                 for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular, heatmap, landscape, umap, circlePack}) {
                     c.setClusterLabels(res.clusterLabels);
                     c.setLabelBudget(labelSlider.getValue());
                     c.setNetworkChanged(MainFrame.this::networkEdited);
                     c.setBeforeEdit(() -> {
                         if (result != null) {
-                            undoStack.push(result.network.deepCopy());
+                            undoStack.push(ProjectStore.copyAnalysis(result));
                             if (undoStack.size() > 12) undoStack.removeLast();
                         }
                     });
@@ -1145,7 +1173,7 @@ public final class MainFrame extends JFrame {
                 clusterPanel.setData(res.network, res.clusterStats, res.clusterLabels);
                 if (timeline.getSelectedNode() == null) nodeInfo.show(null);
                 // 动态窗口标题：项目名 · 网络类型
-                setTitle("Ycscite — " + (project == null ? "" : project.name + " · ")
+                setTitle("Ycscite "+ycscite.Cli.VERSION+" — " + (project == null ? "" : project.name + " · ")
                         + (Strings.isZh() ? netKindZh(res.network.kind) : res.network.kind));
                 report.setText(buildReport());
                 report.setCaretPosition(0);
@@ -1154,7 +1182,7 @@ public final class MainFrame extends JFrame {
                         Strings.get("report.links2"), res.network.edges.size(),
                         res.modularity, Strings.get("report.clusters"),
                         res.clusterStats == null ? 0 : res.clusterStats.size()));
-                setCursor(java.awt.Cursor.getDefaultCursor());
+                setCursor(java.awt.Cursor.getDefaultCursor());rendering=false;
             }
         };
         worker.execute();
@@ -1215,7 +1243,7 @@ public final class MainFrame extends JFrame {
             for (int i = 0; i < en.getValue().size(); i++) {
                 if (i > 0) sb.append("; ");
                 sb.append(en.getValue().get(i).term)
-                  .append(String.format(" (LLR %.1f)", en.getValue().get(i).g2));
+                  .append(String.format(" (score %.1f)", en.getValue().get(i).g2));
             }
             sb.append('\n');
         }
@@ -1223,8 +1251,8 @@ public final class MainFrame extends JFrame {
         result.network.nodeCollection().stream()
                 .sorted((a, b) -> Integer.compare(b.weight, a.weight))
                 .limit(12)
-                .forEach(n -> sb.append(String.format("  %-28s %s=%-4d %.3f=%.3f σ=%.1f #%d%n",
-                        n.label, Strings.isZh() ? "频次" : "freq", n.weight, n.centrality, n.centrality, n.sigma, n.cluster)));
+                .forEach(n -> sb.append(String.format("  %-28s %s=%-4d C_B=%.3f σ=%.1f #%d%n",
+                        n.label, Strings.isZh() ? "频次" : "freq", n.weight, n.centrality, n.sigma, n.cluster)));
         long bursts = result.network.nodeCollection().stream().filter(n -> n.burstness > 0).count();
         sb.append('\n').append(Strings.get("report.burstnodes")).append(" ").append(bursts).append('\n');
         result.network.nodeCollection().stream()
@@ -1352,7 +1380,7 @@ public final class MainFrame extends JFrame {
                 avi.addFrame(c.renderImage(1280, 720));
             }
             c.setYearCutoff(result.network.maxYear);
-            JOptionPane.showMessageDialog(this, Strings.get("dialog.saved") + "  (" + avi.framesWritten() + " 帧)");
+            JOptionPane.showMessageDialog(this, Strings.get("dialog.saved") + "  (" + avi.framesWritten() + (Strings.isZh()?" 帧)":" frames)"));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("dialog.fail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -1371,16 +1399,11 @@ public final class MainFrame extends JFrame {
     private void openProjectPath(java.nio.file.Path path) {
         try {
             ProjectStore.Bundle b = ProjectStore.load(path);
-            this.project = b.project;
-            syncOptions(b.options);
+            setBundle(b);
             RecentFiles.add(path.toString());
             rebuildRecentMenu();
             if (b.result != null) {
-                this.result = b.result;
-                refresh(project.name + " — " + (Strings.isZh() ? netKindZh(result.network.kind) : result.network.kind));
                 JOptionPane.showMessageDialog(this, Strings.get("proj.loaded"));
-            } else {
-                runPipeline();
             }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("proj.loadfail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -1403,15 +1426,18 @@ public final class MainFrame extends JFrame {
 
     /** 将载入的选项同步回界面控件。 */
     private void syncOptions(Pipeline.Options o) {
-        if (o == null) return;
-        networkKind.setSelectedItem(netKindZh(o.networkKind));
-        topN.setValue(o.topN);
-        clusterAlgo.setSelectedItem(Pipeline.MODULARITY.equalsIgnoreCase(o.clustering)
-                ? Strings.get("algo.modularity") : Strings.get("algo.spectral"));
-        String lab = o.labeling == null ? ycscite.analysis.Labelers.LLR : o.labeling;
-        labelAlgo.setSelectedItem(ycscite.analysis.Labelers.LSI.equalsIgnoreCase(lab) ? Strings.get("label.lsi")
-                : ycscite.analysis.Labelers.ISI_KW.equalsIgnoreCase(lab) ? Strings.get("label.isikw")
-                : Strings.get("label.llr"));
+        if(o==null)return;inheritedOptions=ycscite.io.PipelineOptionsCodec.copy(o);
+        networkKind.setSelectedItem(netKindZh(o.networkKind));topN.setValue(o.topN);
+        clusterAlgo.setSelectedItem(Strings.get(Pipeline.EM.equals(o.clustering)?"algo.em":Pipeline.SPECTRAL.equals(o.clustering)?"algo.spectral":"algo.modularity"));
+        String labelKey=switch(o.labeling.toUpperCase(java.util.Locale.ROOT)){case "LSI"->"label.lsi";case "ISI-KW"->"label.isikw";case "TFIDF"->"label.tfidf";case "MI"->"label.mi";case "KCORE"->"label.kcore";default->"label.llr";};labelAlgo.setSelectedItem(Strings.get(labelKey));
+        fromYear.setValue(o.fromYear<=0&&project!=null&&project.minYear>0?project.minYear:o.fromYear);
+        toYear.setValue(o.toYear>=9999&&project!=null&&project.maxYear>0?project.maxYear:o.toYear);
+        sliceYears.setValue(o.sliceYears);topPerSlice.setValue(o.topNPerSlice);gindexK.setValue(o.gindexK);
+        selectionBox.setSelectedItem(Strings.get(Pipeline.G_INDEX.equals(o.selection)?"sel.gindex":Pipeline.TOP_N_PCT.equals(o.selection)?"sel.topnpct":"sel.topn"));
+        pruningBox.setSelectedItem(Strings.get("mst".equals(o.pruning)?"prune.mst":"pathfinder".equals(o.pruning)?"prune.pf":"prune.none"));
+        minLinkStrength.setValue(o.minLinkStrength);largestCC.setValue(o.largestKComponents);minCluster.setValue(o.minClusterSize);singularCheck.setSelected(o.singularKeywords);
+        String sourceKey=switch(o.labelSource.toUpperCase(java.util.Locale.ROOT)){case "T"->"src.t";case "A"->"src.a";case "WC"->"src.wc";case "R"->"src.r";case "TKA"->"src.tka";default->"src.k";};labelSource.setSelectedItem(Strings.get(sourceKey));
+        spanInitialized=true;
     }
 
     private void exportPng() {

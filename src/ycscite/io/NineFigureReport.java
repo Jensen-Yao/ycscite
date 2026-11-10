@@ -29,14 +29,7 @@ public final class NineFigureReport {
   Set<String> chosen=new LinkedHashSet<>(settings.list("charts"));
   for(String key:chosen)if(FIGURES.stream().noneMatch(f->f.key.equals(key)))throw new IllegalArgumentException("Unknown chart: "+key);
   if(chosen.isEmpty())throw new IllegalArgumentException("Choose at least one chart");
-  Project p=new Project();p.name=source.name;int undated=0,excluded=0;
-  for(var record:source.records){
-   if(record.year<=0){undated++;continue;}
-   if((settings.integer("from_year")>0&&record.year<settings.integer("from_year"))||(settings.integer("to_year")>0&&record.year>settings.integer("to_year"))){excluded++;continue;}
-   p.add(record);
-  }
-  if(settings.bool("deduplicate"))p.dedup();
-  if(p.records.isEmpty())throw new IllegalArgumentException("No dated records in the selected year range");
+  var included=prepare(source,settings);Project p=included.project();int undated=included.undated(),excluded=included.excluded();
   progress.accept((settings.english()?"Records included: ":"纳入文献：")+p.records.size()+" · "+p.minYear+"–"+p.maxYear);
   Files.createDirectories(out);Path data=Files.createDirectories(out.resolve("data"));
   try(var stream=NineFigureReport.class.getResourceAsStream("/ycscite-logo.png")){if(stream!=null)Files.copy(stream,out.resolve("ycscite-logo.png"),StandardCopyOption.REPLACE_EXISTING);}
@@ -127,8 +120,8 @@ public final class NineFigureReport {
    dataNames.add(file);
   }
 
-  var manifest=new LinkedHashMap<String,Object>();manifest.put("schema_version",2);manifest.put("engine_version",ycscite.Cli.VERSION);manifest.put("fingerprint_schema",DataFingerprint.SCHEMA);manifest.put("source_fingerprint",DataFingerprint.of(source));manifest.put("project",p.name);
-  manifest.put("records",p.records.size());manifest.put("undated_records",undated);manifest.put("excluded_by_year",excluded);
+  var manifest=new LinkedHashMap<String,Object>();manifest.put("schema_version",2);manifest.put("engine_version",ycscite.Cli.VERSION);manifest.put("fingerprint_schema",DataFingerprint.SCHEMA);manifest.put("source_fingerprint",DataFingerprint.of(source));manifest.put("analysis_fingerprint",DataFingerprint.of(p));manifest.put("project",p.name);
+  manifest.put("records",p.records.size());manifest.put("deduplicated_records",included.duplicates());manifest.put("undated_records",undated);manifest.put("excluded_by_year",excluded);
   manifest.put("from_year",p.minYear);manifest.put("to_year",p.maxYear);manifest.put("parameters",settings.map());manifest.put("figures",generated);
   var stats=new ArrayList<Map<String,Object>>();for(var e:results.entrySet()){var r=e.getValue();stats.add(Map.of("kind",e.getKey(),"nodes",r.network.nodes.size(),"edges",r.network.edges.size(),"modularity",r.modularity,"silhouette",weightedSilhouette(r)));}
   var artifacts=new ArrayList<Map<String,Object>>();
@@ -138,11 +131,30 @@ public final class NineFigureReport {
    if(export[0].equals("svg")||export[0].equals("pdf")){artifact.put("no_logo_file","no-logo/"+export[1]);artifact.put("with_logo_file","with-logo/"+export[1]);}
    artifacts.add(artifact);
   }
+  var projectFiles=new ArrayList<Map<String,Object>>();Path projects=Files.createDirectories(out.resolve("projects"));
+  for(var entry:results.entrySet()){
+   String kind=entry.getKey(),networkKey=kind.equals("authors")?"author":kind.equals("institutions")?"institution":kind.equals("focus")?settings.text("network"):"keyword";
+   String file="projects/"+kind+".csl-proj";ProjectStore.save(out.resolve(file),p,entry.getValue(),settings.pipeline(networkKey));
+   projectFiles.add(Map.of("kind",kind,"file",file,"network",networkKey,"analysis_fingerprint",DataFingerprint.of(p)));
+  }
+  manifest.put("project_files",projectFiles);
   manifest.put("artifacts",artifacts);
   manifest.put("data_files",new ArrayList<>(dataNames));
   manifest.put("networks",stats);manifest.put("landscape_metric","annual_keyword_occurrences_normalized_per_cluster");
   Files.writeString(out.resolve("manifest.json"),MiniJson.write(manifest));index(out,p,undated,settings,generated);
   }
+ }
+ public record Included(Project project,int undated,int excluded,int duplicates){}
+ public static Included prepare(Project source,Settings settings){
+  Project p=new Project();p.name=source.name;int undated=0,excluded=0;
+  for(var record:source.records){
+   if(record.year<=0){undated++;continue;}
+   if((settings.integer("from_year")>0&&record.year<settings.integer("from_year"))||(settings.integer("to_year")>0&&record.year>settings.integer("to_year"))){excluded++;continue;}
+   p.add(record);
+  }
+  int duplicates=settings.bool("deduplicate")?p.dedup():0;
+  if(p.records.isEmpty())throw new IllegalArgumentException("No dated records in the selected year range");
+  return new Included(p,undated,excluded,duplicates);
  }
  private static double weightedSilhouette(Pipeline.Result result){double sum=0,count=0;for(var stats:result.clusterStats.values())if(stats.length>1&&Double.isFinite(stats[1])){sum+=stats[0]*stats[1];count+=stats[0];}return count>0?sum/count:0;}
  private static Pipeline.Result analyze(Project p,Settings settings,String kind){return Pipeline.run(p,settings.pipeline(kind));}
@@ -161,6 +173,9 @@ public final class NineFigureReport {
   var html=new StringBuilder("<!doctype html><html lang=\""+(en?"en":"zh-CN")+"\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>"+title+"</title><style>body{font:15px/1.6 system-ui,sans-serif;margin:0;background:#f4f7fa;color:#243a52}main{max-width:1400px;margin:auto;padding:28px}header{display:flex;gap:14px;align-items:center}header img{width:46px}section{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px}figure{background:white;border:1px solid #dfe5ec;border-radius:6px;margin:0;overflow:hidden}figure img{width:100%;height:400px;object-fit:contain}figcaption{padding:14px}a{color:#305f91}p{color:#687c91}</style><main><header><img src=\"ycscite-logo.png\" alt=\"Ycscite\"><h1>"+title+"</h1></header>");
   html.append("<p>").append(p.records.size()).append(en?" included records · ":" 篇纳入文献 · ").append(p.minYear).append("–").append(p.maxYear).append(" · ").append(undated).append(en?" undated records excluded":" 条无年份记录未计入").append("</p>");
   html.append("<p><a href=\"settings.json\">").append(en?"Reproducible settings":"可复用参数").append("</a> · <a href=\"data/publications.tsv\">").append(en?"Annual counts":"年度计数").append("</a> · <a href=\"data/display-clusters.tsv\">").append(en?"Cluster mapping":"聚类映射").append("</a></p><section>");
+  html.append("</section><p>").append(en?"Editable projects: ":"可编辑项目：");
+  for(String kind:List.of("keywords","authors","institutions","focus"))if(Files.isRegularFile(out.resolve("projects/"+kind+".csl-proj")))html.append("<a download href=\"projects/").append(kind).append(".csl-proj\">").append(en?kind:switch(kind){case "keywords"->"关键词";case "authors"->"作者";case "institutions"->"机构";default->"当前分析网络";}).append("</a> · ");
+  html.append("</p><section>");
   for(var f:figures){String file=escape(f.get("file"));html.append("<figure><a href=\"").append(file).append("\"><img loading=\"lazy\" src=\"").append(file).append("\" alt=\"").append(escape(f.get("title"))).append("\"></a><figcaption>").append(escape(f.get("title"))).append(" · <a download href=\"with-logo/").append(file).append("\">").append(en?"With logo":"带标识下载").append("</a> · <a download href=\"no-logo/").append(file).append("\">").append(en?"Without logo":"无标识下载").append("</a></figcaption></figure>");}
   Files.writeString(out.resolve("index.html"),html.append("</section></main></html>").toString());
  }

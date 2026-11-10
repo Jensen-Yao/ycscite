@@ -177,7 +177,7 @@ public final class Strings {
         ZH.put("canvas.nodes", " 节点，"); ZH.put("canvas.links", " 连接  ");
         ZH.put("canvas.hint", "｜滚轮=缩放 拖拽=平移 悬停=详情");
         ZH.put("mode.timeline", "时间线"); ZH.put("mode.timezone", "时区"); ZH.put("mode.merged", "合并");
-        ZH.put("legend.clusters", "聚类（LLR 标签）");
+        ZH.put("legend.clusters", "聚类");
         ZH.put("legend.years", "年份（节点年轮颜色）");
         ZH.put("legend.centrality", "紫环 = 高中介中心性");
         ZH.put("legend.burst", "红环 = 突现");
@@ -393,7 +393,7 @@ public final class Strings {
         EN.put("canvas.nodes", " nodes, "); EN.put("canvas.links", " links  ");
         EN.put("canvas.hint", "| wheel=zoom drag=pan hover=details");
         EN.put("mode.timeline", "Timeline"); EN.put("mode.timezone", "Timezone"); EN.put("mode.merged", "Merged");
-        EN.put("legend.clusters", "Clusters (LLR labels)");
+        EN.put("legend.clusters", "Clusters");
         EN.put("legend.years", "Years (node ring colors)");
         EN.put("legend.centrality", "Purple ring = centrality");
         EN.put("legend.burst", "Red ring = burst");

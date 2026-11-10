@@ -14,7 +14,7 @@ Features include import diagnostics, 13 named input formats, 10 network types, 3
 
 ## Get started
 
-Download `Ycscite-0.3.2-windows-x64.zip` from Releases and extract the **entire folder**. Launch `Ycscite.exe` or use the browser launcher. Select an individual view and run it; batch export is a separate explicit action. A compact Java 21 runtime is included; the desktop shell uses system Edge WebView2. CLI/headless need neither a browser nor WebView2.
+Download `Ycscite-0.3.3-windows-x64.zip` from Releases and extract the **entire folder**. Launch `Ycscite.exe` or use the browser launcher. Select an individual view and run it; batch export is a separate explicit action. A compact Java 21 runtime is included; the desktop shell uses system Edge WebView2. CLI/headless need neither a browser nor WebView2.
 
 ```powershell
 .\ycscite-cli.exe --json doctor
@@ -49,3 +49,5 @@ Ycscite is not affiliated with CiteSpace and does not promise identical clusters
 Data and default analysis remain local. Advanced online search and explicitly configured remote-model tools contact their corresponding services only when invoked. See the [method inventory](docs/CAPABILITIES.md), [protocol](docs/HEADLESS.md), and [development guide](docs/DEVELOPMENT.md).
 
 The local workspace remembers language, analysis settings, input paths, the active view and result across restarts and port changes. Web/desktop runs use separate result subdirectories. Parsed-record SHA-256 identities in `inspect` and manifests detect changed source data; existing images remain available as explicitly marked historical results.
+
+Editable `.csl-proj` files retain the included corpus, full analysis options, exact network and manual annotations. Download the current network as an Editable project or open it in the advanced editor; changed settings are passed to the editor rather than replaced with its older defaults. Versioned record TSV preserves multivalue content and control characters.

@@ -33,7 +33,7 @@ import java.util.List;
  *   ycscite doctor                                              环境与版本自检
  */
 public final class Cli {
-    public static final String VERSION = "0.3.2";
+    public static final String VERSION = "0.3.3";
 
     public static int run(String[] args) {
         try {

@@ -9,6 +9,7 @@ import javax.imageio.ImageIO;
 /** Cross-format, protocol, configuration and download invariants for the product entry points. */
 public final class ProductTests {
  public static void run()throws Exception{
+  ProjectFidelityTests.run();
   Path root=Files.createTempDirectory("ycscite-product-");
   Path mixed=Files.createDirectory(root.resolve("mixed"));
   Files.writeString(mixed.resolve("note.txt"),"README, not bibliographic data");

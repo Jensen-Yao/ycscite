@@ -53,6 +53,12 @@ public final class ProjectStore {
         return b;
     }
 
+    /** Independent editable analysis state, including its metrics/labels, for undo. */
+    public static Pipeline.Result copyAnalysis(Pipeline.Result result){
+        var bundle=new Bundle();bundle.result=new Pipeline.Result();
+        analysisFrom(analysisJson(result,new Pipeline.Options()),bundle);return bundle.result;
+    }
+
     // ---------------- project ----------------
 
     private static Map<String, Object> projectJson(Project p) {
@@ -79,6 +85,7 @@ public final class ProjectStore {
             rm.put("doi", r.doi);
             rm.put("ut", r.ut);
             rm.put("tc", r.timesCited);
+            rm.put("categories",new ArrayList<>(r.categories));
             records.add(rm);
         }
         m.put("records", records);
@@ -109,6 +116,7 @@ public final class ProjectStore {
             r.doi = str(rm.get("doi"));
             r.ut = str(rm.get("ut"));
             r.timesCited = (int) MiniJson.num(rm.get("tc"));
+            r.categories=strList(rm.get("categories"));
             p.records.add(r);
         }
         return p;
@@ -121,19 +129,10 @@ public final class ProjectStore {
         m.put("kind", r.network.kind);
         m.put("modularity", r.modularity);
         m.put("slices", r.slices);
-        Map<String, Object> om = new LinkedHashMap<>();
-        om.put("networkKind", o.networkKind);
-        om.put("topN", o.topN);
-        om.put("fromYear", o.fromYear);
-        om.put("toYear", o.toYear);
-        om.put("sliceYears", o.sliceYears);
-        om.put("topNPerSlice", o.topNPerSlice);
-        om.put("pruning", o.pruning);
-        om.put("minClusterSize", o.minClusterSize);
-        om.put("clustering", o.clustering);
-        om.put("labeling", o.labeling);
-        om.put("labelsPerCluster", o.labelsPerCluster);
-        m.put("options", om);
+        m.put("options",PipelineOptionsCodec.write(o));
+        m.put("netMinYear",r.network.minYear);m.put("netMaxYear",r.network.maxYear);
+        m.put("paramLines",new ArrayList<>(r.paramLines));
+        m.put("burstRows",r.burstRows.stream().map(ProjectStore::nodeJson).toList());
         if (r.clusterStats != null) {
             Map<String, Object> stats = new LinkedHashMap<>();
             for (Map.Entry<Integer, double[]> en : r.clusterStats.entrySet())
@@ -141,34 +140,7 @@ public final class ProjectStore {
             m.put("clusterStats", stats);
         }
 
-        List<Object> nodes = new ArrayList<>();
-        for (GraphNode n : r.network.nodeCollection()) {
-            Map<String, Object> nm = new LinkedHashMap<>();
-            nm.put("id", n.id);
-            nm.put("label", n.label);
-            nm.put("kind", n.kind);
-            nm.put("weight", n.weight);
-            nm.put("halfLife", n.halfLife);
-            nm.put("centrality", n.centrality);
-            nm.put("pageRank", n.pageRank);
-            nm.put("burstness", n.burstness);
-            nm.put("burstStrength", n.burstStrength);
-            nm.put("sigma", n.sigma);
-            nm.put("cluster", n.cluster);
-            nm.put("firstYear", n.firstYear);
-            Map<String, Object> cy = new LinkedHashMap<>();
-            for (Map.Entry<Integer, Integer> e : n.countsByYear.entrySet())
-                cy.put(String.valueOf(e.getKey()), e.getValue());
-            nm.put("countsByYear", cy);
-            List<Object> bursts = new ArrayList<>();
-            for (int i = 0; i < n.burstIntervals.size(); i++) {
-                int[] b = n.burstIntervals.get(i);
-                double bs = i < n.intervalStrengths.size() ? n.intervalStrengths.get(i) : 0;
-                bursts.add(java.util.Arrays.asList(b[0], b[1], b[2], bs));
-            }
-            nm.put("bursts", bursts);
-            nodes.add(nm);
-        }
+        List<Object> nodes = new ArrayList<>();for(var node:r.network.nodeCollection())nodes.add(nodeJson(node));
         m.put("nodes", nodes);
         List<Object> edges = new ArrayList<>();
         for (var e : r.network.edges)
@@ -186,41 +158,66 @@ public final class ProjectStore {
         return m;
     }
 
+    private static Map<String,Object> nodeJson(GraphNode n){
+        Map<String, Object> nm = new LinkedHashMap<>();
+        nm.put("id", n.id);
+        nm.put("label", n.label);
+        nm.put("kind", n.kind);
+        nm.put("weight", n.weight);
+        nm.put("halfLife", n.halfLife);
+        nm.put("centrality", n.centrality);
+        nm.put("pageRank", n.pageRank);
+        nm.put("degreeCentrality",n.degreeCentrality);nm.put("eigenCentrality",n.eigenCentrality);
+        nm.put("bookmarked",n.bookmarked);nm.put("annotation",n.annotation);nm.put("userLabel",n.userLabel);
+        nm.put("burstness", n.burstness);
+        nm.put("burstStrength", n.burstStrength);
+        nm.put("sigma", n.sigma);
+        nm.put("cluster", n.cluster);
+        nm.put("firstYear", n.firstYear);
+        Map<String, Object> cy = new LinkedHashMap<>();
+        for (Map.Entry<Integer, Integer> e : n.countsByYear.entrySet())
+            cy.put(String.valueOf(e.getKey()), e.getValue());
+        nm.put("countsByYear", cy);
+        List<Object> bursts = new ArrayList<>();
+        for (int i = 0; i < n.burstIntervals.size(); i++) {
+            int[] b = n.burstIntervals.get(i);
+            double bs = i < n.intervalStrengths.size() ? n.intervalStrengths.get(i) : 0;
+            bursts.add(java.util.Arrays.asList(b[0], b[1], b[2], bs));
+        }
+        nm.put("bursts", bursts);
+        return nm;
+    }
+
+    private static GraphNode nodeFrom(Map<String,Object> nm){
+        GraphNode n = new GraphNode(str(nm.get("id")), str(nm.get("label")), str(nm.get("kind")));
+        n.weight = (int) MiniJson.num(nm.get("weight"));
+        n.halfLife = (int) MiniJson.num(nm.get("halfLife"));
+        n.centrality = MiniJson.num(nm.get("centrality"));
+        n.pageRank = MiniJson.num(nm.get("pageRank"));
+        n.degreeCentrality=MiniJson.num(nm.get("degreeCentrality"));n.eigenCentrality=MiniJson.num(nm.get("eigenCentrality"));
+        n.bookmarked=Boolean.TRUE.equals(nm.get("bookmarked"));n.annotation=str(nm.get("annotation"));n.userLabel=nm.get("userLabel") instanceof String label?label:null;
+        n.burstness = MiniJson.num(nm.get("burstness"));
+        n.burstStrength = MiniJson.num(nm.get("burstStrength"));
+        n.sigma = MiniJson.num(nm.get("sigma"));
+        n.cluster = (int) MiniJson.num(nm.get("cluster"));
+        n.firstYear = (int) MiniJson.num(nm.get("firstYear"));
+        for (Map.Entry<String, Object> e : MiniJson.obj(nm.get("countsByYear")).entrySet())
+            n.countsByYear.put(Integer.parseInt(e.getKey()), (int) MiniJson.num(e.getValue()));
+        for (Object bo : MiniJson.arr(nm.get("bursts"))) {
+            List<Object> bl = MiniJson.arr(bo);
+            n.burstIntervals.add(new int[]{(int) MiniJson.num(bl.get(0)),
+                (int) MiniJson.num(bl.get(1)), (int) MiniJson.num(bl.get(2))});
+            n.intervalStrengths.add(bl.size() > 3 ? MiniJson.num(bl.get(3)) : 0.0);
+        }
+        return n;
+    }
+
     private static void analysisFrom(Map<String, Object> m, Bundle b) {
         ycscite.model.Network g = new ycscite.model.Network(str(m.get("kind")));
-        Map<String, Object> om = MiniJson.obj(m.get("options"));
-        b.options.networkKind = str(om.get("networkKind"));
-        b.options.topN = (int) MiniJson.num(om.get("topN"));
-        b.options.clustering = str(om.get("clustering"));
-        b.options.labeling = str(om.get("labeling"));
-        b.options.labelsPerCluster = (int) MiniJson.num(om.get("labelsPerCluster"));
-        b.options.fromYear = om.get("fromYear") == null ? 0 : (int) MiniJson.num(om.get("fromYear"));
-        b.options.toYear = om.get("toYear") == null ? 9999 : (int) MiniJson.num(om.get("toYear"));
-        b.options.sliceYears = om.get("sliceYears") == null ? 1 : (int) MiniJson.num(om.get("sliceYears"));
-        b.options.topNPerSlice = om.get("topNPerSlice") == null ? 0 : (int) MiniJson.num(om.get("topNPerSlice"));
-        b.options.pruning = om.get("pruning") == null ? ycscite.analysis.Pruning.NONE : str(om.get("pruning"));
-        b.options.minClusterSize = om.get("minClusterSize") == null ? 1 : (int) MiniJson.num(om.get("minClusterSize"));
-
+        b.options=PipelineOptionsCodec.read(MiniJson.obj(m.get("options")));
         for (Object no : MiniJson.arr(m.get("nodes"))) {
             Map<String, Object> nm = MiniJson.obj(no);
-            GraphNode n = new GraphNode(str(nm.get("id")), str(nm.get("label")), str(nm.get("kind")));
-            n.weight = (int) MiniJson.num(nm.get("weight"));
-            n.halfLife = (int) MiniJson.num(nm.get("halfLife"));
-            n.centrality = MiniJson.num(nm.get("centrality"));
-            n.pageRank = MiniJson.num(nm.get("pageRank"));
-            n.burstness = MiniJson.num(nm.get("burstness"));
-            n.burstStrength = MiniJson.num(nm.get("burstStrength"));
-            n.sigma = MiniJson.num(nm.get("sigma"));
-            n.cluster = (int) MiniJson.num(nm.get("cluster"));
-            n.firstYear = (int) MiniJson.num(nm.get("firstYear"));
-            for (Map.Entry<String, Object> e : MiniJson.obj(nm.get("countsByYear")).entrySet())
-                n.countsByYear.put(Integer.parseInt(e.getKey()), (int) MiniJson.num(e.getValue()));
-            for (Object bo : MiniJson.arr(nm.get("bursts"))) {
-                List<Object> bl = MiniJson.arr(bo);
-                n.burstIntervals.add(new int[]{(int) MiniJson.num(bl.get(0)),
-                        (int) MiniJson.num(bl.get(1)), (int) MiniJson.num(bl.get(2))});
-                n.intervalStrengths.add(bl.size() > 3 ? MiniJson.num(bl.get(3)) : 0.0);
-            }
+            GraphNode n=nodeFrom(nm);
             g.nodes.put(n.id, n);
         }
         for (Object eo : MiniJson.arr(m.get("edges"))) {
@@ -232,12 +229,10 @@ public final class ProjectStore {
         }
         g.minYear = (int) MiniJson.num(m.getOrDefault("netMinYear", Double.valueOf(Integer.MAX_VALUE)));
         g.maxYear = (int) MiniJson.num(m.getOrDefault("netMaxYear", Double.valueOf(Integer.MIN_VALUE)));
-        // network year range reconstructible from node years when absent
+        // Old projects may not have saved explicit network bounds. Use all observed node years.
         for (GraphNode n : g.nodeCollection()) {
-            if (n.firstYear != Integer.MAX_VALUE) {
-                if (g.minYear == Integer.MAX_VALUE || n.firstYear < g.minYear) g.minYear = n.firstYear;
-                if (g.maxYear == Integer.MIN_VALUE || n.firstYear > g.maxYear) g.maxYear = n.firstYear;
-            }
+            if(!m.containsKey("netMinYear")&&!n.countsByYear.isEmpty())g.minYear=Math.min(g.minYear,n.countsByYear.keySet().stream().mapToInt(Integer::intValue).min().orElse(g.minYear));
+            if(!m.containsKey("netMaxYear")&&!n.countsByYear.isEmpty())g.maxYear=Math.max(g.maxYear,n.countsByYear.keySet().stream().mapToInt(Integer::intValue).max().orElse(g.maxYear));
         }
 
         Map<Integer, List<LLRLabeler.Scored>> labels = new TreeMap<>();
@@ -271,6 +266,8 @@ public final class ProjectStore {
                 if (en.getValue()[0] > 0) en.getValue()[2] /= en.getValue()[0];
             }
         }
+        b.result.paramLines=strList(m.get("paramLines"));
+        b.result.burstRows=new ArrayList<>();for(Object row:MiniJson.arr(m.get("burstRows")))b.result.burstRows.add(nodeFrom(MiniJson.obj(row)));
         b.result.network = g;
         b.result.modularity = MiniJson.num(m.get("modularity"));
         b.result.slices = (int) MiniJson.num(m.get("slices"));

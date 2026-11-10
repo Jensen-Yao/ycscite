@@ -2,72 +2,61 @@ package ycscite.io;
 
 import ycscite.model.Project;
 import ycscite.model.Record;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 记录级 TSV 往返（原版 "WoS ↔ TSV/CSV" 转换器，mF 5.x）：
- * 列 = PT/AU/AF/TI/SO/DE/ID/AB/C1/CR/PY/VL/BP/DI/UT/TC/WC（多值字段以 ';' 连接，制表符转义）。
+/** Versioned record TSV: scalar control characters are escaped; multivalue cells are JSON arrays.
+ * Original 17-column semicolon-separated files remain readable.
  */
 public final class RecordIo {
-
     static final String HEADER = "PT\tAU\tAF\tTI\tSO\tDE\tID\tAB\tC1\tCR\tPY\tVL\tBP\tDI\tUT\tTC\tWC";
-
-    public static void writeTsv(Project p, Path out) throws IOException {
-        StringBuilder sb = new StringBuilder(HEADER).append('\n');
-        for (Record r : p.records)
-            sb.append(j(r.pt)).append('\t').append(j(r.authors)).append('\t').append(j(r.authorsFull))
-              .append('\t').append(j(r.title)).append('\t').append(j(r.source))
-              .append('\t').append(j(r.keywords)).append('\t').append(j(r.keywordsPlus))
-              .append('\t').append(j(r.abstractText)).append('\t').append(j(r.addresses))
-              .append('\t').append(j(r.citedRefs)).append('\t').append(r.year)
-              .append('\t').append(j(r.volume)).append('\t').append(j(r.beginPage))
-              .append('\t').append(j(r.doi)).append('\t').append(j(r.ut)).append('\t').append(r.timesCited)
-              .append('\t').append(j(r.categories)).append('\n');
-        Files.writeString(out, sb.toString(), StandardCharsets.UTF_8);
+    private static final String HEADER_V2 = HEADER+"\tYCSCITE_TSV_V2";
+    private RecordIo() {}
+    public static void writeTsv(Project project,Path out)throws IOException {
+        var text=new StringBuilder(HEADER_V2).append('\n');
+        for(var r:project.records)text.append(escape(r.pt)).append('\t').append(list(r.authors)).append('\t').append(list(r.authorsFull))
+            .append('\t').append(escape(r.title)).append('\t').append(escape(r.source)).append('\t').append(list(r.keywords))
+            .append('\t').append(list(r.keywordsPlus)).append('\t').append(escape(r.abstractText)).append('\t').append(list(r.addresses))
+            .append('\t').append(list(r.citedRefs)).append('\t').append(r.year).append('\t').append(escape(r.volume))
+            .append('\t').append(escape(r.beginPage)).append('\t').append(escape(r.doi)).append('\t').append(escape(r.ut))
+            .append('\t').append(r.timesCited).append('\t').append(list(r.categories)).append("\t2\n");
+        Files.writeString(out,text.toString(),StandardCharsets.UTF_8);
     }
-
-    public static Project readTsv(Path in) throws IOException {
-        Project p = new Project();
-        p.name = in.getFileName().toString().replaceAll("\\.[^.]+$", "");
-        List<String> lines = Files.readAllLines(in, StandardCharsets.UTF_8);
-        for (int i = 1; i < lines.size(); i++) {
-            String[] t = lines.get(i).split("\t", -1);
-            Record r = new Record();
-            if (t.length > 0) r.pt = u(t[0]);
-            if (t.length > 1) addAll(r.authors, u(t[1]));
-            if (t.length > 2) addAll(r.authorsFull, u(t[2]));
-            if (t.length > 3) r.title = u(t[3]);
-            if (t.length > 4) r.source = u(t[4]);
-            if (t.length > 5) addAll(r.keywords, u(t[5]));
-            if (t.length > 6) addAll(r.keywordsPlus, u(t[6]));
-            if (t.length > 7) r.abstractText = u(t[7]);
-            if (t.length > 8) addAll(r.addresses, u(t[8]));
-            if (t.length > 9) addAll(r.citedRefs, u(t[9]));
-            if (t.length > 10) try { r.year = Integer.parseInt(u(t[10]).replaceAll("[^0-9]", "")); } catch (NumberFormatException ignored) { }
-            if (t.length > 11) r.volume = u(t[11]);
-            if (t.length > 12) r.beginPage = u(t[12]);
-            if (t.length > 13) r.doi = u(t[13]);
-            if (t.length > 14) r.ut = u(t[14]);
-            if (t.length > 15) try { r.timesCited = Integer.parseInt(u(t[15]).replaceAll("[^0-9]", "")); } catch (NumberFormatException ignored) { }
-            if (t.length > 16) addAll(r.categories, u(t[16]));
-            p.records.add(r);
+    public static Project readTsv(Path in)throws IOException {
+        var project=new Project();project.name=in.getFileName().toString().replaceAll("\\.[^.]+$","");
+        var lines=Files.readAllLines(in,StandardCharsets.UTF_8);if(lines.isEmpty())return project;
+        String header=lines.getFirst().replaceFirst("^\\uFEFF","");boolean version2=header.equals(HEADER_V2);
+        if(!version2&&!header.equals(HEADER))throw new IOException("Unrecognized Ycscite record TSV header");
+        for(int i=1;i<lines.size();i++){
+            if(lines.get(i).isBlank())continue;
+            String[] cells=lines.get(i).split("\t",-1);
+            if(version2&&(cells.length!=18||!cells[17].equals("2")))throw new IOException("Invalid record TSV v2 row "+(i+1));
+            try{
+                var r=new Record();r.pt=scalar(cells,0,version2);r.authors=values(cells,1,version2);r.authorsFull=values(cells,2,version2);
+                r.title=scalar(cells,3,version2);r.source=scalar(cells,4,version2);r.keywords=values(cells,5,version2);r.keywordsPlus=values(cells,6,version2);
+                r.abstractText=scalar(cells,7,version2);r.addresses=values(cells,8,version2);r.citedRefs=values(cells,9,version2);r.year=number(cells,10,version2);
+                r.volume=scalar(cells,11,version2);r.beginPage=scalar(cells,12,version2);r.doi=scalar(cells,13,version2);r.ut=scalar(cells,14,version2);
+                r.timesCited=number(cells,15,version2);r.categories=values(cells,16,version2);project.add(r);
+            }catch(IllegalArgumentException error){throw new IOException("Invalid record TSV row "+(i+1)+": "+error.getMessage(),error);}
         }
-        return p;
+        return project;
     }
-
-    private static String j(List<String> list) { return String.join(";", list); }
-    private static String j(String s) { return s == null ? "" : s.replace("\t", " ").replace("\n", " ").replace("\r", ""); }
-    private static String u(String s) { return s == null ? "" : s.replace("\\t", "\t").trim(); }
-
-    private static void addAll(List<String> to, String joined) {
-        if (joined == null || joined.isBlank()) return;
-        for (String s : joined.split(";"))
-            if (!s.isBlank()) to.add(s.trim());
+    private static String list(List<String> values){return MiniJson.write(values);}
+    private static String escape(String value){return value==null?"":value.replace("\\","\\\\").replace("\t","\\t").replace("\r","\\r").replace("\n","\\n");}
+    private static String scalar(String[] cells,int index,boolean version2){
+        if(index>=cells.length)return "";String value=cells[index];if(!version2)return value.replace("\\t","\t").trim();
+        var decoded=new StringBuilder();for(int i=0;i<value.length();i++){char c=value.charAt(i);if(c=='\\'&&i+1<value.length()){
+            char next=value.charAt(++i);switch(next){case '\\'->decoded.append('\\');case 't'->decoded.append('\t');case 'n'->decoded.append('\n');case 'r'->decoded.append('\r');default->decoded.append('\\').append(next);}
+        }else decoded.append(c);}return decoded.toString();
     }
+    private static List<String> values(String[] cells,int index,boolean version2){
+        if(index>=cells.length)return new java.util.ArrayList<>();
+        if(!version2)return new java.util.ArrayList<>(java.util.Arrays.stream(scalar(cells,index,false).split(";",-1)).map(String::trim).filter(s->!s.isBlank()).toList());
+        Object parsed=MiniJson.parse(cells[index]);if(!(parsed instanceof List<?> list)||list.stream().anyMatch(v->!(v instanceof String)))throw new IllegalArgumentException("Multivalue fields must be JSON string arrays");
+        return new java.util.ArrayList<>(list.stream().map(String.class::cast).toList());
+    }
+    private static int number(String[] cells,int index,boolean version2){String value=scalar(cells,index,version2);if(!version2){try{return Integer.parseInt(value.replaceAll("[^0-9]",""));}catch(NumberFormatException ignored){return 0;}}return Integer.parseInt(value);}
 }

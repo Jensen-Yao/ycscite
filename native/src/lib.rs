@@ -97,8 +97,12 @@ enum Action {
     /// Interactive legacy workbench with editable nodes and the full analysis menus
     Workbench {
         inputs: Vec<PathBuf>,
-        #[arg(long,default_value="zh",value_parser=["zh","en"])]
-        lang: String,
+        #[arg(long,value_parser=["zh","en"])]
+        lang: Option<String>,
+        #[arg(long, conflicts_with = "project")]
+        config: Option<PathBuf>,
+        #[arg(long,conflicts_with_all=["inputs","config"])]
+        project: Option<PathBuf>,
     },
     /// Execute a batch JSON file (array of requests or a batch request object)
     Batch { request: PathBuf },
@@ -184,8 +188,15 @@ pub fn cli() -> i32 {
                 Err(e) => fail(e, true),
             }
         }
-        Action::Workbench { inputs, lang } => {
-            match engine::Engine::find().and_then(|e| e.workbench(inputs, &lang)) {
+        Action::Workbench {
+            inputs,
+            lang,
+            config,
+            project,
+        } => {
+            match engine::Engine::find()
+                .and_then(|e| e.workbench(inputs, lang.as_deref(), config, project))
+            {
                 Ok(pid) => {
                     println!("{}", json!({"ok":true,"pid":pid}));
                     0
@@ -465,5 +476,52 @@ pub fn desktop() -> Result<(), String> {
     #[cfg(not(windows))]
     {
         Err("桌面版当前面向 Windows；其他系统请运行 ycscite serve。".into())
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+    #[test]
+    fn editor_project_and_config_are_unambiguous() {
+        for args in [
+            vec!["ycscite", "workbench", "--project", "saved.csl-proj"],
+            vec![
+                "ycscite",
+                "workbench",
+                "input.ris",
+                "--config",
+                "settings.json",
+            ],
+            vec![
+                "ycscite",
+                "workbench",
+                "--project",
+                "saved.csl-proj",
+                "--lang",
+                "en",
+            ],
+        ] {
+            assert!(Cli::try_parse_from(args).is_ok());
+        }
+        for args in [
+            vec![
+                "ycscite",
+                "workbench",
+                "input.ris",
+                "--project",
+                "saved.csl-proj",
+            ],
+            vec![
+                "ycscite",
+                "workbench",
+                "--project",
+                "saved.csl-proj",
+                "--config",
+                "settings.json",
+            ],
+        ] {
+            assert!(Cli::try_parse_from(args).is_err());
+        }
     }
 }

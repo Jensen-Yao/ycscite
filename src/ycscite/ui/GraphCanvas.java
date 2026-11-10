@@ -1335,7 +1335,7 @@ public final class GraphCanvas extends JPanel {
         java.util.List<java.awt.Rectangle> placedLabels = new ArrayList<>();
         byWeight.sort((x, y) -> Integer.compare(y.weight, x.weight));
         int budget = labelBudget;
-        Font labelFont = g.getFont().deriveFont(Font.PLAIN, Math.max(7, labelFontSize * 0.65f));
+        Font labelFont = g.getFont().deriveFont(Font.PLAIN, (float)(labelFontSize/Math.min(1,Math.max(.01,zoom))));
         for (GraphNode n : byWeight) {
             if (hiddenNodes.contains(n) || firstYearOf(n) > yearCutoff) continue;
             Point2D.Double p0 = pos.get(n);
@@ -1482,7 +1482,7 @@ public final class GraphCanvas extends JPanel {
                     Color lc = PALETTE[Math.floorMod(n.cluster, PALETTE.length)];
                     labelFg = new Color(lc.getRed(), lc.getGreen(), lc.getBlue(), 220);
                 } else
-                    labelFg = originalStyle ? new Color(20, 20, 20) : new Color(228, 228, 228);
+                    labelFg = originalStyle ? new Color(20, 20, 20) : themeFg();
                 // 四类标签底色（原版 ph:1362-1381 Label Background Color）
                 Color labelBg = clusterLabelBg;   // 当前按节点类型选底色
                 if (n.kind != null && n.kind.contains("cited")) labelBg = articleLabelBg != null ? articleLabelBg : clusterLabelBg;
@@ -1686,11 +1686,11 @@ public final class GraphCanvas extends JPanel {
         int w = 250, x = getWidth() - w - 12, y = 30;
         int clusters = (int) network.nodeCollection().stream().mapToInt(n -> n.cluster).filter(c -> c >= 0).distinct().count();
         int h = 34 + clusters * 16 + 46 + 44;
-        g.setColor(new Color(20, 20, 20, 205));
+        g.setColor(theme==Theme.DARK?new Color(20,20,20,205):new Color(250,249,245,238));
         g.fillRoundRect(x, y, w, h, 10, 10);
-        g.setColor(new Color(110, 110, 110));
+        g.setColor(theme==Theme.DARK?new Color(110,110,110):new Color(210,201,185));
         g.drawRoundRect(x, y, w, h, 10, 10);
-        g.setColor(Color.WHITE);
+        g.setColor(themeFg());
         g.setFont(g.getFont().deriveFont(Font.BOLD, 12f));
         g.drawString(ycscite.I18n.text(Strings.get("legend.clusters")), x + 10, y + 17);
         g.setFont(g.getFont().deriveFont(Font.PLAIN, 11f));
@@ -1699,7 +1699,7 @@ public final class GraphCanvas extends JPanel {
             int c = cs.get(i);
             g.setColor(PALETTE[Math.floorMod(c, PALETTE.length)]);
             g.fillRect(x + 10, yy - 9, 10, 10);
-            g.setColor(new Color(210, 210, 210));
+            g.setColor(themeFg());
             StringBuilder lb = new StringBuilder("#").append(c);
             List<LLRLabeler.Scored> ls = clusterLabels.get(c);
             if (ls != null && !ls.isEmpty()) lb.append("  ").append(ls.get(0).term);
@@ -1707,7 +1707,7 @@ public final class GraphCanvas extends JPanel {
             yy += 16;
         }
         yy += 6;
-        g.setColor(Color.WHITE);
+        g.setColor(themeFg());
         g.setFont(g.getFont().deriveFont(Font.BOLD, 12f));
         g.drawString(ycscite.I18n.text(Strings.get("legend.years")), x + 10, yy);
         yy += 8;
@@ -1715,7 +1715,7 @@ public final class GraphCanvas extends JPanel {
             g.setColor(yearColor(network.minYear + (network.maxYear - network.minYear) * i / 10));
             g.fillRect(x + 10 + i * 22, yy, 22, 10);
         }
-        g.setColor(new Color(210, 210, 210));
+        g.setColor(themeFg());
         g.setFont(g.getFont().deriveFont(Font.PLAIN, 10f));
         g.drawString(ycscite.I18n.text(String.valueOf(network.minYear)), x + 10, yy + 22);
         String maxY = String.valueOf(network.maxYear);
@@ -1724,7 +1724,7 @@ public final class GraphCanvas extends JPanel {
         g.setColor(new Color(148, 0, 211));
         g.setStroke(new BasicStroke(2.5f));
         g.drawOval(x + 14, yy, 10, 10);
-        g.setColor(new Color(210, 210, 210));
+        g.setColor(themeFg());
         g.setFont(g.getFont().deriveFont(Font.PLAIN, 11f));
         g.drawString(ycscite.I18n.text(Strings.get("legend.centrality")), x + 32, yy + 10);
         g.setColor(new Color(220, 20, 60));

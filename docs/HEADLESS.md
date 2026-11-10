@@ -17,7 +17,7 @@ The packaged command is `ycscite-cli.exe`; a development build is `native/target
 | `engine <legacy command...> [--json]` | Complete legacy CLI, with captured JSON output if selected |
 | `serve [--port N] [--report DIR] [--no-open]` | Local browser workbench |
 | `desktop` | Windows app window |
-| `workbench [inputs...] [--lang zh/en]` | Interactive node-editing and legacy analysis menus |
+| `workbench [inputs...] [--config JSON] [--lang zh/en]` | Interactive node-editing with shared settings; `--project FILE` restores an editable result |
 
 `report` / `analyze`: `--out`, `--config`, `--lang zh|en`, `--no-logo`, `--charts comma,separated,keys`, `--set key=JSON`, `--network`, `--format`, `--from`, `--to`, `--slice-years`, `--g-index-k`, `--pruning`, `--clustering`, `--labeling`.
 
@@ -75,3 +75,19 @@ The Web/EXE server binds only `127.0.0.1`. Its internal API validates Host, Orig
 `inspect.result.source_fingerprint` and `manifest.source_fingerprint` identify the same original parsed records, before time filtering or deduplication. `fingerprint_schema` is `ycscite-records-v1`: SHA-256 of the NUL-terminated schema prefix plus a big-endian 32-bit record count, followed by big-endian 32-bit byte lengths and UTF-8 JSON arrays of PT/AU/AF/TI/SO/DE/ID/AB/C1/CR/PY/VL/BP/DI/UT/TC/WC, in record order. Project names and file paths are excluded. This identifies interpreted input data, rather than raw file bytes or scientific validity. Preserve the original inputs and `settings.json` for reproduction. Manifests also record `engine_version`; capabilities, doctor and engine versions must agree.
 
 Application workspace storage is separate from this public headless protocol. Starting CLI/headless analysis does not open a browser, change UI workspace preferences, or require the desktop runtime.
+
+## Editable analysis projects
+
+Reports include `project_files` entries pointing to `projects/*.csl-proj`. Each file contains the included corpus, the exact analyzed network, metric values, clustering, labels and the complete pipeline options. Choose the entry whose `kind` matches the required keyword/author/institution/focus network. The app's **Editable project** download selects the current view's corresponding network.
+
+```powershell
+.\ycscite-cli.exe workbench --project "D:\result\projects\authors.csl-proj" --lang en
+.\ycscite-cli.exe workbench "D:\papers.ris" --config "D:\settings.json"
+.\ycscite-cli.exe engine open "D:\result\projects\authors.csl-proj" --tsv --out "D:\tables"
+```
+
+A project restores its stored network without rerunning selection. `--project` cannot be combined with inputs or `--config`. The input/config form runs the same format, year filtering, deduplication and pipeline settings as a report. GUI operations are intentionally separate from the headless protocol; use `engine open`/the legacy CLI method for non-interactive project exports.
+
+`analysis_fingerprint` identifies the included, filtered/deduplicated records in a report or editable project. It can differ from `source_fingerprint`, which identifies the full original parsed corpus. The exported `records.tsv` corresponds to `analysis_fingerprint`.
+
+New record-level TSV files carry an eighteenth `YCSCITE_TSV_V2` header column and a row version value of `2`. Multivalue fields are JSON string arrays, preserving embedded semicolons, tabs, newlines, empty strings and spacing. Scalar fields escape backslash, tab, CR and LF. The reader still supports the original 17-column semicolon-separated format. These are Ycscite record files, not generic Scopus CSV or WoS tagged exports.

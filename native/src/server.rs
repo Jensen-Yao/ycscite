@@ -491,13 +491,68 @@ fn route(mut request: Request, shared: Arc<Shared>) {
                 }
                 (Method::Post, "/api/workbench") => {
                     let data = body(&mut request)?;
+                    let language = data["language"].as_str().unwrap_or("zh");
+                    if !["zh", "en"].contains(&language) {
+                        return Err("Language must be zh or en".into());
+                    }
+                    if let Some(file) = data["project_file"].as_str() {
+                        let id = data["id"].as_str().ok_or("Missing report ID")?;
+                        let jobs = shared.jobs.lock().unwrap();
+                        let job = jobs
+                            .iter()
+                            .find(|job| job.id == id && job.status == "complete")
+                            .ok_or("Completed report not found")?;
+                        if !job
+                            .manifest
+                            .as_ref()
+                            .and_then(|m| m["project_files"].as_array())
+                            .is_some_and(|files| {
+                                files
+                                    .iter()
+                                    .any(|entry| entry["file"].as_str() == Some(file))
+                            })
+                        {
+                            return Err(
+                                "The requested project is not registered in this report".into()
+                            );
+                        }
+                        let path = safe_file(&job.output, file)?;
+                        return Ok(
+                            json!({"ok":true,"source":"project","pid":shared.engine.workbench(vec![],Some(language),None,Some(path))?}),
+                        );
+                    }
                     let inputs = if data["inputs"].is_array() {
                         paths(&data["inputs"])?
                     } else {
-                        Vec::new()
+                        vec![]
                     };
-                    let language = data["language"].as_str().unwrap_or("zh");
-                    Ok(json!({"ok":true,"pid":shared.engine.workbench(inputs,language)?}))
+                    let response=shared.engine.request(json!({"id":1,"method":"validate_settings","params":{"settings":data["settings"]}}))?;
+                    if response["ok"] != true {
+                        return Err(response["error"]["message"]
+                            .as_str()
+                            .unwrap_or("Invalid settings")
+                            .into());
+                    }
+                    if !inputs.is_empty() {
+                        let inspection=shared.engine.request(json!({"id":1,"method":"inspect","params":{"inputs":inputs,"format":response["result"]["format"]}}))?;
+                        if inspection["ok"] != true {
+                            return Err(inspection["error"]["message"]
+                                .as_str()
+                                .unwrap_or("Input could not be read")
+                                .into());
+                        }
+                    }
+                    let directory = shared.store.join("editor-settings");
+                    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+                    let config = directory.join(format!("{}.json", new_id()));
+                    fs::write(
+                        &config,
+                        serde_json::to_vec(&response["result"]).map_err(|e| e.to_string())?,
+                    )
+                    .map_err(|e| e.to_string())?;
+                    Ok(
+                        json!({"ok":true,"source":"settings","pid":shared.engine.workbench(inputs,Some(language),Some(config),None)?}),
+                    )
                 }
                 (Method::Post, "/api/validate-settings") => {
                     let data = body(&mut request)?;
@@ -690,7 +745,7 @@ fn route(mut request: Request, shared: Arc<Shared>) {
                 let mime = match file.extension().and_then(|v| v.to_str()).unwrap_or("") {
                     "png" => "image/png",
                     "html" => "text/html; charset=utf-8",
-                    "json" => "application/json; charset=utf-8",
+                    "json" | "csl-proj" => "application/json; charset=utf-8",
                     "svg" => "image/svg+xml",
                     "pdf" => "application/pdf",
                     "docx" => {

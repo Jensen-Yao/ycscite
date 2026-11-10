@@ -40,6 +40,10 @@ jobs:
         shell: bash
         run: python tools/smoke-product.py --cli "native/target/release/ycscite${{ runner.os == 'Windows' && '.exe' || '' }}"
 
+      - name: Editor settings and saved projects
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python tools/smoke-editor.py --cli native/target/release/ycscite.exe
       - name: Workspace persistence and recovery
         shell: bash
         run: python tools/smoke-workspace.py --cli "native/target/release/ycscite${{ runner.os == 'Windows' && '.exe' || '' }}"
@@ -56,6 +60,8 @@ jobs:
           python tools/smoke-product.py --cli "dist/Ycscite-$version-windows-x64/ycscite-cli.exe"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/smoke-workspace.py --cli "dist/Ycscite-$version-windows-x64/ycscite-cli.exe"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/smoke-editor.py --cli "dist/Ycscite-$version-windows-x64/ycscite-cli.exe"
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
