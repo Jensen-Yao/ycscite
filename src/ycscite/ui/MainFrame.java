@@ -419,7 +419,7 @@ public final class MainFrame extends JFrame {
 
         // ---------- 数据 ----------
         JPanel data = vPanel();
-        JButton reportButton = new JButton(Strings.isZh() ? "一键生成九图…" : "Generate nine figures…");
+        JButton reportButton = new JButton(Strings.isZh() ? "标准九图报告…" : "Standard nine-chart report…");
         reportButton.addActionListener(e -> generateNineFigures(reportButton));
         data.add(reportButton);
         data.add(strut());
@@ -937,12 +937,13 @@ public final class MainFrame extends JFrame {
         if (files.length == 0) return;
         List<String> inputs = java.util.Arrays.stream(files).map(File::getAbsolutePath).toList();
         File first = files[0].getAbsoluteFile();
-        Path out = (first.isDirectory() ? first : first.getParentFile()).toPath().resolve("ycscite-report");
+        Path out = (first.isDirectory() ? first : first.getParentFile()).toPath().resolve("ycscite-report").resolve(java.util.UUID.randomUUID().toString());
+        var reportSettings=new ycscite.Settings(java.util.Map.of("language",Strings.isZh()?"zh":"en"));
         button.setEnabled(false);
         setStatus(Strings.isZh() ? "正在生成九图…" : "Generating figures…");
         new SwingWorker<Path, String>() {
             @Override protected Path doInBackground() throws Exception {
-                NineFigureReport.write(ycscite.Cli.loadReportInputs(inputs), out, msg -> publish(msg));
+                NineFigureReport.write(ycscite.Cli.loadReportInputs(inputs), out, msg -> publish(msg),reportSettings);
                 return out.resolve("index.html");
             }
             @Override protected void process(List<String> messages) { setStatus(messages.getLast()); }

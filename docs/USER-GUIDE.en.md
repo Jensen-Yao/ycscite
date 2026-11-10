@@ -40,3 +40,5 @@ Projects contain included records, rather than the full unfiltered corpus. Keep 
 New `records.tsv` exports use a version marker and JSON string arrays for multivalue fields, preserving embedded semicolons, control characters and spacing. The older 17-column format remains readable.
 
 Label source K uses the selected labeling algorithm. Other document sources (T/A/WC/R/TKA) currently use document-level LLR; the algorithm and source selectors do not imply arbitrary combinations are all implemented.
+
+The advanced editor’s Standard nine-chart report action is a separate file-import workflow using the standard preset. It follows the current interface language and creates a separate result subfolder. Use the main workbench for individually selected views and custom report settings.
