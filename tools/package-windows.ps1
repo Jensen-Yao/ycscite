@@ -57,8 +57,10 @@ try {
     Copy-Item -LiteralPath native\PORTABLE-README.md -Destination (Join-Path $packageRoot '使用说明.md') -Force
     foreach($directory in @('docs','examples')){
         New-Item -ItemType Directory -Path (Join-Path $packageRoot $directory) -Force | Out-Null
-        Get-ChildItem -LiteralPath $directory -File | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $packageRoot $directory) -Force}
+        Get-ChildItem -LiteralPath $directory -Force | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $packageRoot $directory) -Recurse -Force}
     }
+    New-Item -ItemType Directory -Path (Join-Path $packageRoot 'skills') -Force | Out-Null
+    Get-ChildItem -LiteralPath native\skills -Directory | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $packageRoot 'skills') -Recurse -Force}
     Set-Content -LiteralPath (Join-Path $packageRoot '打开Web工作台.cmd') -Encoding ascii -Value '@echo off','cd /d "%~dp0"','ycscite-cli.exe serve'
     $licensesRoot=Join-Path $packageRoot 'licenses'
     New-Item -ItemType Directory -Path $licensesRoot -Force | Out-Null
