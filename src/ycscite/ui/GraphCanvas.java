@@ -625,8 +625,8 @@ public final class GraphCanvas extends JPanel {
         Point2D.Double p = pos.get(hit);
         if (p != null) {
             zoom = Math.max(zoom, 2.0);
-            offX = getWidth() / 2.0 - p.x * zoom;
-            offY = getHeight() / 2.0 - p.y * zoom;
+            offX = viewportWidth() / 2.0 - p.x * zoom;
+            offY = viewportHeight() / 2.0 - p.y * zoom;
         }
         repaint();
         return true;
@@ -640,10 +640,10 @@ public final class GraphCanvas extends JPanel {
     // ---------- layout ----------
 
     private void fitView() {
-        zoom = Math.min(getWidth() / WORLD_W, getHeight() / WORLD_H);
+        zoom = Math.min(viewportWidth() / WORLD_W, viewportHeight() / WORLD_H);
         if (zoom <= 0 || Double.isNaN(zoom)) zoom = 1;
-        offX = (getWidth() - WORLD_W * zoom) / 2.0;
-        offY = (getHeight() - WORLD_H * zoom) / 2.0;
+        offX = (viewportWidth() - WORLD_W * zoom) / 2.0;
+        offY = (viewportHeight() - WORLD_H * zoom) / 2.0;
     }
 
     private double sizeValue(GraphNode n) {
@@ -1127,12 +1127,12 @@ public final class GraphCanvas extends JPanel {
         Graphics2D g = (Graphics2D) g0;
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setColor(originalStyle ? Color.WHITE : themeBg());
-        if (!transparentBg) g.fillRect(0, 0, getWidth(), getHeight());
+        if (!transparentBg) g.fillRect(0, 0, viewportWidth(), viewportHeight());
         g.setColor(originalStyle ? new Color(30, 30, 30) : themeFg());
         g.setFont(g.getFont().deriveFont(Font.BOLD, 13f));
         // 原版风格：左上参数信息面板（白底半透明小框，视觉分析确认的原版信息框）
         // 面板字号随画幅缩放（8000px 导出时 13px 太小不可读）
-        float panelScale = Math.min(1.6f, Math.max(1f, getWidth() / 1400f));
+        float panelScale = Math.min(1.6f, Math.max(1f, viewportWidth() / 1400f));
         if (originalStyle && !paramPanel.isEmpty()) {
             g.setFont(g.getFont().deriveFont(Font.PLAIN, 13f * panelScale));
             var fm2 = g.getFontMetrics();
@@ -1164,9 +1164,9 @@ public final class GraphCanvas extends JPanel {
             g.setFont(g.getFont().deriveFont(Font.PLAIN, 16f));
             var fm = g.getFontMetrics();
             String[] guide = {Strings.get("empty.1"), Strings.get("empty.2"), Strings.get("empty.3")};
-            int cy = getHeight() / 2 - 40;
+            int cy = viewportHeight() / 2 - 40;
             for (String line : guide) {
-                g.drawString(ycscite.I18n.text(line), (getWidth() - fm.stringWidth(line)) / 2, cy);
+                g.drawString(ycscite.I18n.text(line), (viewportWidth() - fm.stringWidth(line)) / 2, cy);
                 cy += 34;
             }
             return;
@@ -1613,7 +1613,7 @@ public final class GraphCanvas extends JPanel {
             int span = Math.max(network.maxYear - network.minYear, 1);
             for (int y = network.minYear; y <= network.maxYear; y++) {
                 double wx = 90 + (WORLD_W - 180.0) * (y - network.minYear) / span;
-                g.drawString(ycscite.I18n.text(String.valueOf(y)), (int) (offX + wx * zoom) - 14, getHeight() - 8);
+                g.drawString(ycscite.I18n.text(String.valueOf(y)), (int) (offX + wx * zoom) - 14, viewportHeight() - 8);
             }
         }
         drawLegend(g);
@@ -1632,7 +1632,7 @@ public final class GraphCanvas extends JPanel {
         }
         if (originalStyle) {
             // 原版风格图例（仅 -Dycscite.legend701=true 时启用）
-            float ls = Math.max(1f, getWidth() / 1000f);
+            float ls = Math.max(1f, viewportWidth() / 1000f);
             int x = 12;
             int y = (int) ((20 + (paramPanel.isEmpty() ? 30 : paramPanel.size() * 18 + 36)) * ls);
             int rows = Math.min(cs.size(), 15);
@@ -1683,7 +1683,7 @@ public final class GraphCanvas extends JPanel {
             g.drawString(ycscite.I18n.text(Strings.get("legend.burst")), (int) (x + w - 100 * ls), (int) (yy + 33 * ls));
             return;
         }
-        int w = 250, x = getWidth() - w - 12, y = 30;
+        int w = 250, x = viewportWidth() - w - 12, y = 30;
         int clusters = (int) network.nodeCollection().stream().mapToInt(n -> n.cluster).filter(c -> c >= 0).distinct().count();
         int h = 34 + Math.min(clusters,12) * 16 + 46 + 44 + (clusters>12?16:0);
         g.setColor(theme==Theme.DARK?new Color(20,20,20,205):new Color(250,249,245,238));
@@ -1753,7 +1753,7 @@ public final class GraphCanvas extends JPanel {
         for (GraphEdge e : network.edges) {
             Point2D.Double a = pos.get(e.a), b = pos.get(e.b);
             if (a == null || b == null) continue;
-            sb.append(String.format("<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#b8c4d0\" stroke-width=\"%.2f\" opacity=\"0.5\"/>%n",
+            sb.append(String.format(java.util.Locale.ROOT,"<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#b8c4d0\" stroke-width=\"%.2f\" opacity=\"0.5\"/>%n",
                     40 + (a.x - minX) * s, 40 + (a.y - minY) * s, 40 + (b.x - minX) * s, 40 + (b.y - minY) * s,
                     Math.min(3, 0.5 + 0.3 * e.weight)));
         }
@@ -1762,12 +1762,12 @@ public final class GraphCanvas extends JPanel {
             if (p == null) continue;
             double r = radius.getOrDefault(n, 6.0);
             Color c = PALETTE[Math.floorMod(Math.max(n.cluster, 0), PALETTE.length)];
-            sb.append(String.format("<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"rgb(%d,%d,%d)\" stroke=\"#333\" stroke-width=\"0.6\"/>%n",
+            sb.append(String.format(java.util.Locale.ROOT,"<circle cx=\"%.1f\" cy=\"%.1f\" r=\"%.1f\" fill=\"rgb(%d,%d,%d)\" stroke=\"#333\" stroke-width=\"0.6\"/>%n",
                     40 + (p.x - minX) * s, 40 + (p.y - minY) * s, r, c.getRed(), c.getGreen(), c.getBlue()));
-            if (n.weight >= 2)
-                sb.append(String.format("<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#222\" font-family=\"sans-serif\">%s</text>%n",
+            if (n.weight >= 2 || n.userLabel != null && !n.userLabel.isBlank())
+                sb.append(String.format(java.util.Locale.ROOT,"<text x=\"%.1f\" y=\"%.1f\" font-size=\"10\" fill=\"#222\" font-family=\"sans-serif\">%s</text>%n",
                         40 + (p.x - minX) * s + r + 2, 40 + (p.y - minY) * s + 3,
-                        n.label.replace("&", "&amp;").replace("<", "&lt;")));
+                        (n.userLabel==null?n.label:n.userLabel).replace("&", "&amp;").replace("<", "&lt;")));
         }
         sb.append("</svg>\n");
         java.nio.file.Files.writeString(out, sb.toString(), java.nio.charset.StandardCharsets.UTF_8);
@@ -1775,25 +1775,18 @@ public final class GraphCanvas extends JPanel {
 
     public BufferedImage renderImage(int w, int h) { return renderImage(w,h,1); }
 
+    private int exportWidth=0,exportHeight=0;
+    private int viewportWidth(){return exportWidth>0?exportWidth:super.getWidth();}
+    private int viewportHeight(){return exportHeight>0?exportHeight:super.getHeight();}
     public BufferedImage renderImage(int w,int h,int scale) {
-        if(scale<1||scale>5)throw new IllegalArgumentException("Image scale must be1..5");
-        int oldW = getWidth(), oldH = getHeight();
-        setSize(w, h);
-        // 布局已由 show() 完成（世界坐标），此处只重适配视口 —— 避免每张导出重跑 5000 迭代 LinLog
-        if (pos.isEmpty() && network != null) computeLayout();
-        fitView();
-        BufferedImage img = new BufferedImage(w*scale, h*scale, transparentBg ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = img.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g.scale(scale,scale);
-        setBounds(0, 0, w, h);
-        boolean oldOpaque = isOpaque();
-        if (transparentBg) setOpaque(false);   // 透明导出：阻止 UI 委托填充背景
-        paintComponent(g);
-        setOpaque(oldOpaque);
-        g.dispose();
-        setSize(oldW, oldH);
-        return img;
+        if(scale<1||scale>5||w<=0||h<=0)throw new IllegalArgumentException("Invalid image dimensions/scale");
+        int previousWidth=exportWidth,previousHeight=exportHeight;double previousZoom=zoom,previousX=offX,previousY=offY;boolean previousOpaque=isOpaque();
+        var image=new BufferedImage(w*scale,h*scale,transparentBg?BufferedImage.TYPE_INT_ARGB:BufferedImage.TYPE_INT_RGB);Graphics2D graphics=image.createGraphics();
+        try{
+            exportWidth=w;exportHeight=h;if(pos.isEmpty()&&network!=null)computeLayout();fitView();
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);graphics.scale(scale,scale);
+            if(transparentBg)setOpaque(false);paintComponent(graphics);return image;
+        }finally{graphics.dispose();exportWidth=previousWidth;exportHeight=previousHeight;zoom=previousZoom;offX=previousX;offY=previousY;setOpaque(previousOpaque);}
     }
 
     public void snapshotScaled(java.nio.file.Path png,int w,int h,int scale)throws java.io.IOException{

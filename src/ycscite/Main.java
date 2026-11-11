@@ -69,7 +69,7 @@ public final class Main {
             return;
         }
         boolean demo = Arrays.stream(args).anyMatch(a -> a.equals("--demo"));
-        var initialInputs=new java.util.ArrayList<String>();String language=null;Path config=null,projectFile=null,smokeOutput=null;
+        var initialInputs=new java.util.ArrayList<String>();String language=null;Path config=null,projectFile=null,smokeOutput=null;Boolean logoOverride=null;
         for(int i=0;i<args.length;i++){
             switch(args[i]){
                 case "--input"->{if(++i==args.length)throw new IllegalArgumentException("--input needs a path");initialInputs.add(args[i]);}
@@ -77,6 +77,8 @@ public final class Main {
                 case "--config"->{if(++i==args.length)throw new IllegalArgumentException("--config needs a file");config=Path.of(args[i]);}
                 case "--project"->{if(++i==args.length)throw new IllegalArgumentException("--project needs a file");projectFile=Path.of(args[i]);}
                 case "--smoke-output"->{if(++i==args.length)throw new IllegalArgumentException("--smoke-output needs a directory");smokeOutput=Path.of(args[i]);}
+                case "--logo"->{if(Boolean.FALSE.equals(logoOverride))throw new IllegalArgumentException("Choose --logo or --no-logo");logoOverride=true;}
+                case "--no-logo"->{if(Boolean.TRUE.equals(logoOverride))throw new IllegalArgumentException("Choose --logo or --no-logo");logoOverride=false;}
                 case "--demo"->{}
                 default->throw new IllegalArgumentException("Unknown argument: "+args[i]);
             }
@@ -89,7 +91,7 @@ public final class Main {
         final ProjectStore.Bundle startupBundle=projectFile==null?null:ProjectStore.load(projectFile);
         Project loaded=initialInputs.isEmpty()?(demo?DemoData.generate(120):null):Cli.loadInputs(initialInputs,startupSettings==null?"auto":startupSettings.text("format"));
         final Project initial=loaded!=null&&startupSettings!=null?NineFigureReport.prepare(loaded,startupSettings).project():loaded;
-        final Path diagnostics=smokeOutput;
+        final Path diagnostics=smokeOutput;final Boolean requestedLogo=logoOverride;
         // 启动画面（闪屏 1.2 秒）
         JWindow splash = new JWindow();
         splash.setSize(420, 260);
@@ -135,13 +137,17 @@ public final class Main {
             MainFrame frame=new MainFrame();
             if(startupBundle!=null)frame.setBundle(startupBundle);
             else {if(initial!=null)frame.setProject(initial);if(startupSettings!=null)frame.applySettings(startupSettings);if(initial!=null)frame.runPipeline();}
+            if(requestedLogo!=null)frame.setExportLogo(requestedLogo);
             frame.setVisible(true);
             if(diagnostics!=null){var capture=new javax.swing.Timer(100,event->{if(frame.isRendering())return;((javax.swing.Timer)event.getSource()).stop();try{
                 if(frame.renderFailure()!=null)throw new IllegalStateException("Editor layout failed",frame.renderFailure());
                 Files.createDirectories(diagnostics);
                 var image=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);
                 var graphics=image.createGraphics();frame.paint(graphics);graphics.dispose();javax.imageio.ImageIO.write(image,"png",diagnostics.resolve("editor.png").toFile());
-                frame.saveDiagnostics(diagnostics);frame.dispose();System.exit(0);
+                frame.saveDiagnostics(diagnostics);
+                var layout=(java.awt.BorderLayout)frame.getContentPane().getLayout();var west=(javax.swing.JTabbedPane)layout.getLayoutComponent(java.awt.BorderLayout.WEST);west.setSelectedIndex(west.getTabCount()-1);frame.validate();
+                var controls=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);var drawing=controls.createGraphics();frame.paint(drawing);drawing.dispose();javax.imageio.ImageIO.write(controls,"png",diagnostics.resolve("export-controls.png").toFile());
+                frame.dispose();System.exit(0);
             }catch(Exception error){error.printStackTrace();frame.dispose();System.exit(1);}});capture.start();}
         });
     }

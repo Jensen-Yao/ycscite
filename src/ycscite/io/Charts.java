@@ -39,7 +39,7 @@ public final class Charts {
             g.setColor(new Color(30, 30, 30));
             g.setFont(g.getFont().deriveFont(Font.BOLD, 18f));
             g.drawString(ycscite.I18n.text("年度发文量趋势"), 30, 40);
-            if (byYear.isEmpty()) return;
+            if(byYear.isEmpty()){g.setFont(g.getFont().deriveFont(Font.PLAIN,17f));g.drawString(ycscite.I18n.isEnglish()?"No dated records are available":"没有可用的年份记录",40,200);return;}
             int max = Collections.max(byYear.values());
             int y0 = 70, hAxis = h - 90, x0 = 70, wPlot = w - 110;
             int n = byYear.size();
@@ -67,7 +67,7 @@ public final class Charts {
 
     /** x=年份；各聚类每年的活动量（节点逐年计数之和）顺序堆叠成面积"山峰"。 */
     public static void clusterEvolution(Pipeline.Result r, Path out) throws IOException {
-        if (r == null || r.network == null || r.network.minYear == Integer.MAX_VALUE) return;
+        if(r==null||r.network==null||r.network.minYear==Integer.MAX_VALUE){noData(out,1440,1119,ycscite.I18n.text("聚类演化山峰"),ycscite.I18n.isEnglish()?"No annual node activity is available":"没有可用的节点年度活动数据");return;}
         int y0 = r.network.minYear, y1 = r.network.maxYear;
         List<Integer> years = new ArrayList<>();
         for (int y = y0; y <= y1; y++) years.add(y);
@@ -256,6 +256,10 @@ public final class Charts {
         return r.network.nodeCollection();
     }
 
+    /** A requested export always replaces its own output, even when the data is insufficient. */
+    public static void noData(Path out,int width,int height,String title,String reason)throws IOException{
+        render(out,width,height,(g,w,h)->{g.setColor(Color.WHITE);g.fillRect(0,0,w,h);g.setColor(new Color(40,49,61));g.setFont(g.getFont().deriveFont(Font.BOLD,24f));g.drawString(title,40,55);g.setColor(new Color(101,112,126));g.setFont(g.getFont().deriveFont(Font.PLAIN,18f));g.drawString(reason,40,h/2);});
+    }
     private interface Painter { void paint(Graphics2D g, int w, int h); }
 
     private static void render(Path out, int w, int h, Painter painter) throws IOException {

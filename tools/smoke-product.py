@@ -63,6 +63,29 @@ def main():
         again=json.loads(run(["inspect",record_copy,"--json"]).stdout)["result"]
         assert again["source_fingerprint"]==manifest["analysis_fingerprint"]
 
+        override = work / "logo-override"
+        branded = json.loads(run(["report", sample, "--config", config, "--charts", "publications", "--logo", "--out", override, "--json"]).stdout)
+        assert branded["manifest"]["parameters"]["logo"] is True
+        assert (override/"01-publications.png").read_bytes()==(override/"with-logo/01-publications.png").read_bytes()
+        legacy = work / "legacy-visuals"
+        legacy_result = json.loads(run(["--json", "engine", "analyze", sample, "--trend", "--svg", "--pdf", "--no-logo", "--lang", "en", "--out", legacy]).stdout)
+        assert legacy_result["ok"] and legacy_result["exit_code"] == 0
+        assert [p.name for p in legacy.glob("*.png")] == ["publication-trend.png"]
+        for filename in ["publication-trend.png", "network.svg", "report.pdf"]:
+            assert (legacy / filename).read_bytes() == (legacy / "no-logo" / filename).read_bytes()
+            assert (legacy / "with-logo" / filename).is_file()
+        assert b"/FlateDecode" in (legacy / "report.pdf").read_bytes() and b"/DCTDecode" not in (legacy / "report.pdf").read_bytes()
+        project = out / next(p["file"] for p in manifest["project_files"] if p["kind"] == "keywords")
+        assert json.loads(project.read_text(encoding="utf-8"))["exportLogo"] is False
+        reopened = work / "project-visuals"
+        restored = json.loads(run(["--json", "engine", "open", project, "--svg", "--pdf", "--out", reopened]).stdout)
+        assert restored["ok"] and not (reopened / "network.png").exists()
+        for filename in ["network.svg", "report.pdf"]:
+            assert (reopened / filename).read_bytes() == (reopened / "no-logo" / filename).read_bytes()
+        logo_override = work / "headless-logo-override"
+        legacy_stream = run(["headless"], stdin=json.dumps({"id":"logo", "method":"cli", "params":{"arguments":["open", str(project), "--svg", "--logo", "--lang", "en", "--out", str(logo_override)]}}) + "\n")
+        assert json.loads(legacy_stream.stdout)["ok"]
+        assert (logo_override / "network.svg").read_bytes() == (logo_override / "with-logo/network.svg").read_bytes()
         requests = [
             '{"id":9007199254740993,"method":"capabilities"}',
             '{broken',
@@ -88,7 +111,7 @@ def main():
         run(["report", work / "missing.txt", "--json"], expected=1)
         print(json.dumps({"ok":True,"charts":18,"formats":13,"records":72,
                           "checks":["unrelated-cwd", "config", "all-charts", "all-analysis-tables", "all-exports",
-                                    "logo-variants", "pdf-pages", "editable-projects", "lossless-records-tsv", "ndjson-framing", "integer-id", "error-recovery",
+                                    "logo-variants", "legacy-and-project-logo", "headless-logo-override", "lossless-pdf", "pdf-pages", "editable-projects", "lossless-records-tsv", "ndjson-framing", "integer-id", "error-recovery",
                                     "batch-isolation", "request-relative-paths", "exit-codes"]}, ensure_ascii=False))
 
 

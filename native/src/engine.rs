@@ -92,6 +92,7 @@ impl Engine {
         language: Option<&str>,
         config: Option<PathBuf>,
         project: Option<PathBuf>,
+        logo: Option<bool>,
     ) -> Result<u32, String> {
         if project.is_some() && (!inputs.is_empty() || config.is_some()) {
             return Err("A saved project cannot be combined with input/config".into());
@@ -134,6 +135,9 @@ impl Engine {
         }
         if let Some(path) = project {
             command.arg("--project").arg(absolute(&path)?);
+        }
+        if let Some(logo) = logo {
+            command.arg(if logo { "--logo" } else { "--no-logo" });
         }
         for input in inputs {
             command.arg("--input").arg(absolute(&input)?);

@@ -28,12 +28,16 @@ public final class ProjectStore {
         public Project project;
         public Pipeline.Result result;   // null when saved without analysis
         public Pipeline.Options options;
+        public Boolean exportLogo;
     }
 
-    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o) throws IOException {
+    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o) throws IOException {save(file,p,r,o,null);}
+    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o,boolean logo)throws IOException{save(file,p,r,o,Boolean.valueOf(logo));}
+    private static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o,Boolean logo)throws IOException {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("format", FORMAT);
         root.put("project", projectJson(p));
+        if(logo!=null)root.put("exportLogo",logo);
         if (r != null) root.put("analysis", analysisJson(r, o));
         Files.writeString(file, MiniJson.write(root), StandardCharsets.UTF_8);
     }
@@ -44,6 +48,7 @@ public final class ProjectStore {
             throw new IOException("不是 csl-proj 项目文件（format=" + root.get("format") + "）");
         Bundle b = new Bundle();
         b.project = projectFrom(MiniJson.obj(root.get("project")));
+        b.exportLogo=root.get("exportLogo") instanceof Boolean logo?logo:null;
         Object analysis = root.get("analysis");
         if (analysis != null) {
             b.options = new Pipeline.Options();

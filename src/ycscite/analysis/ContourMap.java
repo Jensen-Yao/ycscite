@@ -23,13 +23,17 @@ public final class ContourMap {
         public static Params defaults() { return new Params(120, 15, 24, "heatmap", false); }
     }
 
+    private static void empty(Path out,String zh,String en)throws IOException{
+        ycscite.io.Charts.noData(out,1400,800,ycscite.I18n.text("聚类活动等值线"),ycscite.I18n.isEnglish()?en:zh);
+    }
+
     public static void render(Network g, Path out, Params p) throws IOException {
-        if (g == null || g.minYear == Integer.MAX_VALUE) return;
+        if(g==null||g.minYear==Integer.MAX_VALUE){empty(out,"没有可用的年份数据","No dated network data is available");return;}
         int y0 = g.minYear, y1 = g.maxYear, years = y1 - y0 + 1;
         Map<Integer, List<GraphNode>> byCluster = new TreeMap<>();
         for (GraphNode n : g.nodeCollection()) byCluster.computeIfAbsent(n.cluster, k -> new ArrayList<>()).add(n);
         int k = byCluster.size();
-        if (k < 2 || years < 2) return;
+        if(k<2||years<2){empty(out,"至少需要两个聚类和两个年份","At least two clusters and two years are required");return;}
 
         // 密度矩阵 [k][years]
         double[][] density = new double[k][years];
@@ -47,7 +51,7 @@ public final class ContourMap {
         // 归一化
         double max = 0;
         for (double[] row : smooth) for (double v : row) max = Math.max(max, v);
-        if (max <= 0) return;
+        if(max<=0){empty(out,"没有可用的年度活动数据","No annual activity is available");return;}
 
         int w = 1400, h = 800;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
@@ -57,7 +61,7 @@ public final class ContourMap {
         g2.fillRect(0, 0, w, h);
         g2.setColor(new Color(30, 30, 30));
         g2.setFont(g2.getFont().deriveFont(Font.BOLD, 16f));
-        g2.drawString(ycscite.I18n.text("Contour Map"), 30, 30);
+        g2.drawString(ycscite.I18n.text("聚类活动等值线"), 30, 30);
 
         int left = 100, top = 60, cw = w - left - 60, ch = h - top - 60;
         // 色板渲染（简化版等高线：色块 + 等值线）

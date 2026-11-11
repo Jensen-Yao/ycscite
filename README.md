@@ -13,14 +13,14 @@
 - **可编辑项目**：当前网络和完整参数可保存、下载并在高级窗口恢复；书签、批注和自定义名称可保留。高级窗口继承主工作台设置。
 - **可调参数**：时间切片、g-index / Top N / Top N%、网络类型、剪枝、相似度、聚类与标注、排除词、突现参数、节点与标签大小、连线透明度、导出清晰度。
 - **导入预检**：自动识别多种格式，检查年份、关键词、作者、机构和参考文献的覆盖；支持混合目录、UTF-8 / UTF-16 与常见中文历史编码。
-- **输出可复用**：PNG、离线 HTML、数据表、JSON 参数与清单；可额外输出 SVG、PDF、DOCX、SQL、Pajek、GEXF、RIS。PNG / SVG / PDF 提供带 Logo 和无 Logo 两种版本。
+- **输出可复用**：PNG、离线 HTML、数据表、JSON 参数与清单；可额外输出 SVG、PDF、DOCX、SQL、Pajek、GEXF、RIS。PNG / SVG / PDF 在报告、高级窗口和旧 CLI 中均可选择带 Logo / 无 Logo；透明 PNG 保留透明度，PDF 不拉伸图形并保留中文可读性。
 - **中文 / English**：界面与通用图题可切换；文献题名、作者和关键词保留原文。
 
 ![Ycscite workbench](docs/images/workbench-zh.png)
 
 ## Windows 便携版
 
-从 Releases 下载 `Ycscite-0.3.3-windows-x64.zip`，**完整解压**后双击 `Ycscite.exe`。选择文献目录或点击「使用示例」，选中所需图谱，再点击「运行分析」。一次运行只生成当前图；「批量导出」可自行勾选多图。
+从 Releases 下载 `Ycscite-0.3.4-windows-x64.zip`，**完整解压**后双击 `Ycscite.exe`。选择文献目录或点击「使用示例」，选中所需图谱，再点击「运行分析」。一次运行只生成当前图；「批量导出」可自行勾选多图。
 
 包内附带精简 Java 21 运行时，无需配置 Java。桌面窗口使用系统 Microsoft Edge WebView2 Runtime。也可以运行 `打开Web工作台.cmd` 在默认浏览器使用；CLI/headless 不需要 WebView2 或浏览器。
 

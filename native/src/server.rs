@@ -492,6 +492,10 @@ fn route(mut request: Request, shared: Arc<Shared>) {
                 (Method::Post, "/api/workbench") => {
                     let data = body(&mut request)?;
                     let language = data["language"].as_str().unwrap_or("zh");
+                    let logo = data["logo"].as_bool();
+                    if data.get("logo").is_some_and(|value| !value.is_boolean()) {
+                        return Err("logo must be boolean".into());
+                    }
                     if !["zh", "en"].contains(&language) {
                         return Err("Language must be zh or en".into());
                     }
@@ -518,7 +522,7 @@ fn route(mut request: Request, shared: Arc<Shared>) {
                         }
                         let path = safe_file(&job.output, file)?;
                         return Ok(
-                            json!({"ok":true,"source":"project","pid":shared.engine.workbench(vec![],Some(language),None,Some(path))?}),
+                            json!({"ok":true,"source":"project","pid":shared.engine.workbench(vec![],Some(language),None,Some(path),logo)?}),
                         );
                     }
                     let inputs = if data["inputs"].is_array() {
@@ -551,7 +555,7 @@ fn route(mut request: Request, shared: Arc<Shared>) {
                     )
                     .map_err(|e| e.to_string())?;
                     Ok(
-                        json!({"ok":true,"source":"settings","pid":shared.engine.workbench(inputs,Some(language),Some(config),None)?}),
+                        json!({"ok":true,"source":"settings","pid":shared.engine.workbench(inputs,Some(language),Some(config),None,logo)?}),
                     )
                 }
                 (Method::Post, "/api/validate-settings") => {

@@ -15,6 +15,7 @@ public final class I18n {
 
  private static final Map<String,String> EN=new LinkedHashMap<>();
  static {
+  EN.put("（本数据未检测到突现词）","No keyword bursts were detected");
   String[][] entries={
    {"年度发文量趋势","Annual publication trend"},{"关键词共现网络","Keyword co-occurrence network"},
    {"关键词聚类","Keyword clusters"},{"关键词时区","Keyword time zone"},{"关键词时间线","Keyword timeline"},

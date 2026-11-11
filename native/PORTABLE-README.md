@@ -1,4 +1,4 @@
-# Ycscite0.3.3 · Windows portable / Windows 便携版
+# Ycscite0.3.4 · Windows portable / Windows 便携版
 
 完整解压目录，双击 `Ycscite.exe`。选择数据，查看预检，在上方选中需要的图，点击「运行分析」。一次只生成当前图；批量导出时自行勾选多图。第一次可以点击「使用示例」。左侧可直接调整常用参数，其他设置在「分析设置」中。English 可切换界面和通用图文标签。下载时可切换 Logo 显隐。
 
@@ -23,3 +23,7 @@ Read docs/USER-GUIDE.en.md or docs/USER-GUIDE.zh.md for the workflow; docs/HEADL
 可在下载格式中选择「可编辑项目」。高级窗口会恢复当前分析网络，或使用当前设置，支持保存批注、书签与重命名。`workbench --project <文件>` 可直接恢复项目。记录级 TSV 新格式保留多值字段内的分号和换行，并兼容旧版导入。
 
 Choose Editable project to retain the current network, corpus and complete options. The advanced editor restores that result or uses the current settings; it preserves bookmarks, annotations and renamed labels when saved. `workbench --project <file>` restores a project directly.
+
+高级窗口「导出」页和「文件」菜单提供图片 Logo 选项。PNG、SVG、PDF 均保留两种版本；页脚独立于数据区，透明 PNG 不失去透明度。CLI 可使用 --logo / --no-logo；PDF 图形不拉伸，中文摘要可读。
+
+The advanced editor's Export tab/File menu includes the logo choice. Static PNG/SVG/PDF keep both variants, preserving chart data; transparent PNG remains transparent. Use --logo / --no-logo in CLI exports. PDF pages preserve aspect ratio and CJK labels.

@@ -13,6 +13,9 @@ public final class Strings {
     private static final Map<String, String> EN = new HashMap<>();
 
     static {
+        ZH.put("export.logo","图片中显示 Logo");EN.put("export.logo","Include logo in visual exports");
+        ZH.put("export.logo.hint","PNG、SVG、PDF 使用独立页脚，不覆盖图形数据。");EN.put("export.logo.hint","PNG, SVG and PDF use a separate footer; chart data remains intact.");
+        ZH.put("export.svg","导出网络 SVG…");EN.put("export.svg","Export network SVG…");
         ZH.put("app.title", "Ycscite — 科学知识图谱分析");
         ZH.put("menu.file", "文件"); ZH.put("menu.view", "视图");
         ZH.put("menu.lang", "语言"); ZH.put("menu.lang.zh", "中文"); ZH.put("menu.lang.en", "English");

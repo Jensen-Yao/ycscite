@@ -33,9 +33,16 @@ import java.util.List;
  *   ycscite doctor                                              环境与版本自检
  */
 public final class Cli {
-    public static final String VERSION = "0.3.3";
+    public static final String VERSION = "0.3.4";
 
     public static int run(String[] args) {
+        String language=new Parse(args).opt("lang",I18n.isEnglish()?"en":"zh");
+        if(!java.util.Set.of("zh","en").contains(language)){System.err.println("Language must be zh or en");return 2;}
+        var previous=ycscite.ui.Strings.getLang();String previousLayout=layoutOpt;
+        try(var scope=I18n.language(language)){ycscite.ui.Strings.setLang(language.equals("en")?ycscite.ui.Strings.Lang.EN:ycscite.ui.Strings.Lang.ZH);return dispatch(args);}
+        finally{ycscite.ui.Strings.setLang(previous);layoutOpt=previousLayout;}
+    }
+    private static int dispatch(String[] args) {
         try {
             if (args.length == 0 || args[0].equals("help") || args[0].equals("--help")) {
                 printHelp();
@@ -242,30 +249,37 @@ public final class Cli {
         }
         boolean originalStyle = originalPreset || "citespace701".equalsIgnoreCase(p.opt("preset", "none"))
                 || "original".equalsIgnoreCase(p.opt("style", "dark"));
+        boolean logo=exportLogo(p,true);
         Pipeline.Result r = Pipeline.run(project, o);
         if (originalPreset)
             System.out.println("预设[原版]: 每片 Top25（严格硬截·保留孤立点） · 1年片 · Pathfinder  → N=" + r.network.nodes.size()
                     + " E=" + r.network.edges.size());
 
-        boolean any = !(png || html || tsv || pdf || docx || sql || cit || summary || trend || evolution || burstTable);
+        boolean any = !(png || html || tsv || pdf || docx || sql || cit || summary || trend || evolution || burstTable || p.flag("svg") || p.flag("tsne") || p.flag("thematic") || p.flag("contour") || p.flag("dual-map"));
         if (any) { tsv = true; png = true; html = true; }
         Files.createDirectories(out);
-        emit(r, out, png, html, tsv, pdf, docx, sql, cit, project, originalStyle);
+        emit(r, out, png, html, tsv, pdf, docx, sql, cit, project, originalStyle,exportLogo(p,true));
         if (png) {
             // 三视图一并输出：时区 / 合并（network.png 保持时间线视图，兼容既有输出）
             GraphCanvas tz = styledCanvas(r, project, GraphCanvas.Mode.TIMEZONE, originalStyle);
             tz.snapshot(out.resolve("network-timezone.png"), originalStyle ? 8000 : 4000, originalStyle ? 5000 : 2500);
+            Branding.variants(out.resolve("network-timezone.png"),logo);
             GraphCanvas mg = styledCanvas(r, project, GraphCanvas.Mode.MERGED, originalStyle);
             mg.snapshot(out.resolve("network-merged.png"), originalStyle ? 8000 : 4000, originalStyle ? 5000 : 2500);
+            Branding.variants(out.resolve("network-merged.png"),logo);
             GraphCanvas tl = styledCanvas(r, project, GraphCanvas.Mode.TIMELINE, originalStyle);
             tl.snapshot(out.resolve(originalStyle ? "network-timeline-original.png" : "network-tl.png"),
                     originalStyle ? 8000 : 4000, originalStyle ? 5000 : 2500);
+            Branding.variants(out.resolve(originalStyle?"network-timeline-original.png":"network-tl.png"),logo);
             GraphCanvas ci = styledCanvas(r, project, GraphCanvas.Mode.CIRCULAR, originalStyle);
             ci.snapshot(out.resolve("network-circular.png"), 1600, 1000);
+            Branding.variants(out.resolve("network-circular.png"),logo);
             GraphCanvas hm = styledCanvas(r, project, GraphCanvas.Mode.HEATMAP, originalStyle);
             hm.snapshot(out.resolve("network-heatmap.png"), 1600, 1000);
+            Branding.variants(out.resolve("network-heatmap.png"),logo);
             GraphCanvas lc = styledCanvas(r, project, GraphCanvas.Mode.LANDSCAPE, originalStyle);
             lc.snapshot(out.resolve("network-landscape.png"), 1600, 1000);
+            Branding.variants(out.resolve("network-landscape.png"),logo);
             System.out.println(originalStyle
                     ? "导出: 原版风格(白底/红标签45°) network-timeline-original.png + network-timezone.png + network-merged.png"
                     : "导出: network-timezone.png + network-merged.png");
@@ -273,14 +287,17 @@ public final class Cli {
         }
         if (trend) {
             Charts.publicationTrend(project, out.resolve("publication-trend.png"));
+            Branding.variants(out.resolve("publication-trend.png"),logo);
             System.out.println("导出: publication-trend.png（年度发文量）");
         }
         if (evolution) {
             Charts.clusterEvolution(r, out.resolve("cluster-evolution.png"));
+            Branding.variants(out.resolve("cluster-evolution.png"),logo);
             System.out.println("导出: cluster-evolution.png（聚类演化山峰图）");
         }
         if (burstTable) {
             Charts.burstTable(r, out.resolve("burst-top.png"), Integer.parseInt(p.opt("burst-top", "25")));
+            Branding.variants(out.resolve("burst-top.png"),logo);
             Charts.burstTsv(r, out.resolve("burst.tsv"));
             System.out.println("导出: burst-top.png + burst.tsv（突现表）");
         }
@@ -312,6 +329,7 @@ public final class Cli {
         if (p.flag("svg")) {
             GraphCanvas svgCanvas = styledCanvas(r, project, GraphCanvas.Mode.MERGED, originalStyle);
             svgCanvas.writeSvg(out.resolve("network.svg"), 2400, 1500);
+            Branding.svgVariants(out.resolve("network.svg"),logo,2400,1500);
             System.out.println("导出: network.svg（矢量图，对应原版 View As SVG）");
         }
         // 主路径分析（原版 "Add Main Path Layers"，Hummon-Doreian SPC；需 WoS 类含 CR 的数据）
@@ -397,6 +415,7 @@ public final class Cli {
         // Thematic Map（原版 CS:675，简化版：四象限主题地图）
         if (p.flag("thematic")) {
             ycscite.analysis.ThematicMap.render(r, out.resolve("thematic-map.png"));
+            Branding.variants(out.resolve("thematic-map.png"),logo);
             System.out.println("导出: thematic-map.png（主题地图，四象限）");
         }
         // SVO 全文目录（原版 CS:826 Process Multiple Folders）
@@ -445,6 +464,7 @@ public final class Cli {
                     p.opt("contour-cmap", "heatmap"),
                     p.flag("contour-citation"));
             ycscite.analysis.ContourMap.render(r.network, out.resolve("contour-map.png"), cp2);
+            Branding.variants(out.resolve("contour-map.png"),logo);
             System.out.println("导出: contour-map.png（等高线图，" + cp2.colormap() + " 色板）");
         }
         // 引用上下文不确定度（原版 "Computing uncertainties of citation contexts"）
@@ -477,6 +497,7 @@ public final class Cli {
                     GraphCanvas lay = styledCanvas(r, project, GraphCanvas.Mode.MERGED, originalStyle);
                     lay.setOverlayLayer(lines);
                     lay.snapshot(out.resolve("network-layer.png"), originalStyle ? 8000 : 4000, originalStyle ? 5000 : 2500);
+                    Branding.variants(out.resolve("network-layer.png"),logo);
                     System.out.println("导出: network-layer.png（叠加 " + lay.getOverlayEdgeCount() + " 条 .layer 边）");
                 }
             } catch (java.io.IOException ex) {
@@ -503,6 +524,7 @@ public final class Cli {
         }
         if (p.flag("dual-map")) {
             DualMap.renderJcr(project, out.resolve("dual-map.png"));
+            Branding.variants(out.resolve("dual-map.png"),logo);
             System.out.println("导出: dual-map.png（双图叠加）");
         }
         if (p.flag("tsne")) {
@@ -510,6 +532,7 @@ public final class Cli {
             t.setClusterLabels(r.clusterLabels);
             t.show(r.network, GraphCanvas.Mode.TSNE, "Ycscite — " + project.name);
             t.snapshot(out.resolve("network-tsne.png"), 1600, 1000);
+            Branding.variants(out.resolve("network-tsne.png"),logo);
             System.out.println("导出: network-tsne.png（t-SNE 视图）");
         }
         if (p.flag("merge-variants")) {
@@ -517,7 +540,7 @@ public final class Cli {
             System.out.println("引文变体合并: " + merged + " 个节点归并");
         }
         if (save != null) {
-            ProjectStore.save(Path.of(save), project, r, o);
+            ProjectStore.save(Path.of(save), project, r, o,logo);
             System.out.println("已保存项目: " + save);
         }
         return 0;
@@ -568,7 +591,7 @@ public final class Cli {
         Pipeline.Options o = options(net, 50, "modularity", label);
         Pipeline.Result r = Pipeline.run(project, o);
         Files.createDirectories(out);
-        emit(r, out, true, true, true, false, false, false, true, project);
+        emit(r, out, true, true, true, false, false, false, true, project,false,exportLogo(p,true));
         return 0;
     }
 
@@ -661,6 +684,7 @@ public final class Cli {
                 var pngCanvas = new GraphCanvas();
                 pngCanvas.show(r.network, GraphCanvas.Mode.MERGED, name);
                 pngCanvas.snapshot(out.resolve("network.png"), 1600, 1000);
+                Branding.variants(out.resolve("network.png"),exportLogo(p,true));
                 done++;
                 System.out.printf("  [%d/%d] %s → N=%d E=%d%n", done, files.size(), name, r.network.nodes.size(), r.network.edges.size());
             } catch (Exception e) {
@@ -710,6 +734,7 @@ public final class Cli {
         GraphCanvas c = new GraphCanvas();
         c.show(g, GraphCanvas.Mode.MERGED, in.getFileName().toString());
         c.snapshot(out.resolve("network.png"), 1600, 1000);
+        Branding.variants(out.resolve("network.png"),exportLogo(p,true));
         System.out.println("导出: " + out.resolve("network.png"));
         return 0;
     }
@@ -722,8 +747,10 @@ public final class Cli {
         if (b.result == null) throw new CliError("项目不含分析状态（请用 analyze 重新分析）");
         Path out = Path.of(p.opt("out", "ycscite-out"));
         Files.createDirectories(out);
-        boolean any = !(png || html || tsv || cit);
-        emit(b.result, out, png || any, html || any, tsv || any, false, false, false, cit, b.project);
+        boolean any = !(png || html || tsv || cit || p.flag("pdf") || p.flag("svg"));
+        emit(b.result, out, png || any, html || any, tsv || any, p.flag("pdf"), false, false, cit, b.project,false,exportLogo(p,b.exportLogo==null||b.exportLogo));
+        if(p.flag("svg")){var canvas=styledCanvas(b.result,b.project,GraphCanvas.Mode.MERGED,false);canvas.writeSvg(out.resolve("network.svg"),2400,1500);Branding.svgVariants(out.resolve("network.svg"),exportLogo(p,b.exportLogo==null||b.exportLogo),2400,1500);}
+
         return 0;
     }
 
@@ -858,6 +885,9 @@ public final class Cli {
     static void emit(Pipeline.Result r, Path out, boolean png, boolean html, boolean tsv,
                      boolean pdf, boolean docx, boolean sql, boolean cit, Project project,
                      boolean originalStyle) throws Exception {
+        emit(r,out,png,html,tsv,pdf,docx,sql,cit,project,originalStyle,true);
+    }
+    static void emit(Pipeline.Result r,Path out,boolean png,boolean html,boolean tsv,boolean pdf,boolean docx,boolean sql,boolean cit,Project project,boolean originalStyle,boolean showLogo)throws Exception {
         System.out.println("数据集: " + project.name + "  记录: " + project.records.size()
                 + "  年份: " + (project.minYear == Integer.MAX_VALUE ? "?" : project.minYear)
                 + "-" + (project.maxYear == Integer.MIN_VALUE ? "?" : project.maxYear));
@@ -884,6 +914,7 @@ public final class Cli {
         if (png) {
             GraphCanvas c = styledCanvas(r, project, GraphCanvas.Mode.TIMELINE, originalStyle);
             c.snapshot(out.resolve("network.png"), originalStyle ? 8000 : 4000, originalStyle ? 5000 : 2500);
+            Branding.variants(out.resolve("network.png"),showLogo);
             System.out.println("导出: network.png" + (originalStyle ? "（原版风格）" : ""));
         }
         if (html) {
@@ -894,7 +925,7 @@ public final class Cli {
             GraphCanvas c = new GraphCanvas();
             c.setClusterLabels(r.clusterLabels);
             c.show(r.network, GraphCanvas.Mode.TIMELINE, "Ycscite — " + project.name);
-            PdfExporter.write(out.resolve("report.pdf"), c.renderImage(1600, 1000), r.network, project.name);
+            PdfExporter.variants(out.resolve("report.pdf"), c.renderImage(1600, 1000), r.network, project.name,showLogo);
             System.out.println("导出: report.pdf");
         }
         if (docx) {
@@ -910,6 +941,10 @@ public final class Cli {
         }
     }
 
+    private static boolean exportLogo(Parse arguments,boolean fallback){
+        if(arguments.flag("logo")&&arguments.flag("no-logo"))throw new CliError("Choose --logo or --no-logo, not both");
+        return arguments.flag("logo")||(!arguments.flag("no-logo")&&fallback);
+    }
     static void printHelp() {
         System.out.println("""
                 Ycscite — 科学知识图谱分析（CLI）
@@ -920,10 +955,10 @@ public final class Cli {
                       [--cluster spectral|modularity] [--label llr|lsi|isikw] [--out 目录]
                       [--from 年] [--to 年] [--slice 年数] [--per-slice N] [--pruning none|mst|pathfinder]
                       [--min-cluster N] [--dedup] [--cluster-summary]
-                      [--png --html --tsv --pdf --docx --sql --citation-report] [--save 项目.csl-proj]
+                      [--png --html --tsv --pdf --docx --sql --citation-report] [--logo|--no-logo] [--save 项目.csl-proj]
                   ycscite search "检索词" [--rows N] [--net ...] [--out 目录]
                   ycscite video <输入文件...> [--out evo.avi] [--net ...]
-                  ycscite open 项目.csl-proj [--png --html --tsv --citation-report] [--out 目录]
+                  ycscite open 项目.csl-proj [--png --svg --pdf --html --tsv --citation-report] [--logo|--no-logo] [--out 目录]
                   ycscite doctor
                   ycscite gui        启动图形界面
                 """);

@@ -35,8 +35,10 @@ struct AnalysisArgs {
     config: Option<PathBuf>,
     #[arg(long,value_parser=["zh","en"])]
     lang: Option<String>,
-    #[arg(long)]
+    #[arg(long, conflicts_with = "logo")]
     no_logo: bool,
+    #[arg(long, conflicts_with = "no_logo")]
+    logo: bool,
     #[arg(long, value_delimiter = ',')]
     charts: Vec<String>,
     #[arg(long = "set", value_name = "KEY=JSON")]
@@ -103,6 +105,10 @@ enum Action {
         config: Option<PathBuf>,
         #[arg(long,conflicts_with_all=["inputs","config"])]
         project: Option<PathBuf>,
+        #[arg(long, conflicts_with = "no_logo")]
+        logo: bool,
+        #[arg(long, conflicts_with = "logo")]
+        no_logo: bool,
     },
     /// Execute a batch JSON file (array of requests or a batch request object)
     Batch { request: PathBuf },
@@ -193,10 +199,24 @@ pub fn cli() -> i32 {
             lang,
             config,
             project,
+            logo,
+            no_logo,
         } => {
-            match engine::Engine::find()
-                .and_then(|e| e.workbench(inputs, lang.as_deref(), config, project))
-            {
+            match engine::Engine::find().and_then(|e| {
+                e.workbench(
+                    inputs,
+                    lang.as_deref(),
+                    config,
+                    project,
+                    if logo {
+                        Some(true)
+                    } else if no_logo {
+                        Some(false)
+                    } else {
+                        None
+                    },
+                )
+            }) {
                 Ok(pid) => {
                     println!("{}", json!({"ok":true,"pid":pid}));
                     0
@@ -268,6 +288,8 @@ pub fn cli() -> i32 {
             }
             if args.no_logo {
                 extra.push("--no-logo".into());
+            } else if args.logo {
+                extra.push("--logo".into());
             }
             if !args.charts.is_empty() {
                 extra.extend(["--charts".into(), args.charts.join(",").into()]);
@@ -483,6 +505,14 @@ pub fn desktop() -> Result<(), String> {
 mod cli_tests {
     use super::*;
     #[test]
+    fn analysis_logo_override_is_unambiguous() {
+        assert!(Cli::try_parse_from(["ycscite", "report", "input.ris", "--logo"]).is_ok());
+        assert!(Cli::try_parse_from(["ycscite", "analyze", "input.ris", "--no-logo"]).is_ok());
+        assert!(
+            Cli::try_parse_from(["ycscite", "report", "input.ris", "--logo", "--no-logo"]).is_err()
+        );
+    }
+    #[test]
     fn editor_project_and_config_are_unambiguous() {
         for args in [
             vec!["ycscite", "workbench", "--project", "saved.csl-proj"],
@@ -520,6 +550,7 @@ mod cli_tests {
                 "--config",
                 "settings.json",
             ],
+            vec!["ycscite", "workbench", "--logo", "--no-logo"],
         ] {
             assert!(Cli::try_parse_from(args).is_err());
         }

@@ -5,6 +5,7 @@ import ycscite.analysis.LLRLabeler;
 import ycscite.analysis.NetworkBuilders;
 import ycscite.analysis.Pipeline;
 import ycscite.io.CnkiParser;
+import ycscite.io.Branding;
 import ycscite.io.CssciParser;
 import ycscite.io.CrossRefClient;
 import ycscite.io.DemoData;
@@ -75,6 +76,7 @@ public final class MainFrame extends JFrame {
     private final GraphCanvas umap = new GraphCanvas();
     private final GraphCanvas circlePack = new GraphCanvas();
     private final JTextArea report = new JTextArea();
+    private final JCheckBox includeLogo=new JCheckBox(Strings.get("export.logo"),true);
     private final JTabbedPane tabs = new JTabbedPane();
     private final AnimationBar anim = new AnimationBar(this::currentCanvas);
     // 新增选项控件：时间范围 / 片长 / 每片 Top N / 剪枝 / 最小聚类
@@ -271,6 +273,7 @@ public final class MainFrame extends JFrame {
         recentMenuHolder[0] = recent;
         rebuildRecentMenu();
         file.add(recent);
+        var logoMenu=new JCheckBoxMenuItem(Strings.get("export.logo"));logoMenu.setModel(includeLogo.getModel());file.add(logoMenu);
         file.addSeparator();
         file.add(exit);
         JMenu view = new JMenu(Strings.get("menu.view"));
@@ -338,7 +341,7 @@ public final class MainFrame extends JFrame {
     /** 语言切换：静态语言位 + 重建窗口（保留当前数据与结果）。 */
     private void relaunch(Strings.Lang language) {
         if(Strings.getLang()==language)return;
-        var bundle=new ProjectStore.Bundle();bundle.project=project;bundle.result=result;bundle.options=currentOptions();
+        var bundle=new ProjectStore.Bundle();bundle.project=project;bundle.result=result;bundle.options=currentOptions();bundle.exportLogo=includeLogo.isSelected();
         Strings.setLang(language);
         SwingUtilities.invokeLater(()->{var frame=new MainFrame();if(bundle.project!=null)frame.setBundle(bundle);frame.setVisible(true);dispose();});
     }
@@ -734,8 +737,10 @@ public final class MainFrame extends JFrame {
 
         // ---------- 导出 ----------
         JPanel ex = vPanel();
+        includeLogo.setAlignmentX(0);includeLogo.setToolTipText(Strings.get("export.logo.hint"));ex.add(includeLogo);ex.add(strut());
         for (Object[] act : new Object[][]{
                 {Strings.get("export.png"), (Runnable) this::exportPng},
+                {Strings.get("export.svg"), (Runnable) this::exportSvg},
                 {Strings.get("export.html"), (Runnable) this::exportHtml},
                 {Strings.get("export.tsv"), (Runnable) this::exportTables},
                 {Strings.get("export.cluster.summary"), (Runnable) this::exportClusterSummary},
@@ -900,6 +905,7 @@ public final class MainFrame extends JFrame {
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
             ycscite.io.DualMap.renderJcr(project, fc.getSelectedFile().toPath());
+            Branding.variants(fc.getSelectedFile().toPath(),includeLogo.isSelected());
             JOptionPane.showMessageDialog(this, Strings.get("dialog.saved"));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("dialog.fail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -938,7 +944,7 @@ public final class MainFrame extends JFrame {
         List<String> inputs = java.util.Arrays.stream(files).map(File::getAbsolutePath).toList();
         File first = files[0].getAbsoluteFile();
         Path out = (first.isDirectory() ? first : first.getParentFile()).toPath().resolve("ycscite-report").resolve(java.util.UUID.randomUUID().toString());
-        var reportSettings=new ycscite.Settings(java.util.Map.of("language",Strings.isZh()?"zh":"en"));
+        var reportSettings=new ycscite.Settings(java.util.Map.of("language",Strings.isZh()?"zh":"en","logo",includeLogo.isSelected()));
         button.setEnabled(false);
         setStatus(Strings.isZh() ? "正在生成九图…" : "Generating figures…");
         new SwingWorker<Path, String>() {
@@ -1018,12 +1024,12 @@ public final class MainFrame extends JFrame {
 
     /** Restore the analyzed project as-is; editing starts from the report's nodes and options. */
     public void setBundle(ProjectStore.Bundle bundle) {
-        this.project=bundle.project;syncOptions(bundle.options);
+        this.project=bundle.project;syncOptions(bundle.options);if(bundle.exportLogo!=null)includeLogo.setSelected(bundle.exportLogo);
         if(bundle.result!=null){this.result=bundle.result;undoStack.clear();refresh(project.name+" — "+(Strings.isZh()?netKindZh(result.network.kind):result.network.kind));}
         else runPipeline();
     }
     public void applySettings(ycscite.Settings settings) {
-        syncOptions(settings.pipeline(null));
+        syncOptions(settings.pipeline(null));includeLogo.setSelected(settings.bool("logo"));
         labelSlider.setValue(settings.integer("label_budget"));
         fontSpin.setValue((int)Math.clamp(12*settings.number("label_scale"),6,24));
         for(GraphCanvas canvas:new GraphCanvas[]{timeline,timezone,merged,tsne,circular,heatmap,landscape,umap,circlePack}){
@@ -1033,16 +1039,17 @@ public final class MainFrame extends JFrame {
     }
     /** Reproducible diagnostics for the interactive editor, also used by its UI smoke mode. */
     public Map<String,Object> analysisState() {
-        var state=new java.util.LinkedHashMap<String,Object>();state.put("options",ycscite.io.PipelineOptionsCodec.write(currentOptions()));
+        var state=new java.util.LinkedHashMap<String,Object>();state.put("options",ycscite.io.PipelineOptionsCodec.write(currentOptions()));state.put("export_logo",includeLogo.isSelected());
         if(project!=null){state.put("source_fingerprint",ycscite.io.DataFingerprint.of(project));state.put("records",project.records.size());}
         if(result!=null){state.put("nodes",result.network.nodes.size());state.put("edges",result.network.edges.size());state.put("modularity",result.modularity);}
         return state;
     }
 
-    public void saveDiagnostics(Path folder)throws java.io.IOException{
+    public void saveDiagnostics(Path folder)throws Exception{
         java.nio.file.Files.writeString(folder.resolve("state.json"),ycscite.io.MiniJson.write(analysisState()));
-        if(project!=null)ProjectStore.save(folder.resolve("analysis.csl-proj"),project,result,currentOptions());
+        if(project!=null)ProjectStore.save(folder.resolve("analysis.csl-proj"),project,result,currentOptions(),includeLogo.isSelected());
         if(result!=null)Exporters.writeTables(result.network,result.clusterLabels,folder.resolve("nodes.tsv"),folder.resolve("edges.tsv"));
+        if(result!=null)for(String format:new String[]{"png","svg","pdf"})exportVisual(folder.resolve("network."+format),format);
     }
 
     private boolean rendering=false;
@@ -1318,9 +1325,7 @@ public final class MainFrame extends JFrame {
         fc.setSelectedFile(new File("report.pdf"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
-            BufferedImage img = currentCanvas().renderImage(1600, 1000);
-            PdfExporter.write(fc.getSelectedFile().toPath(), img, result.network,
-                    project == null ? "Ycscite" : project.name);
+            exportVisual(fc.getSelectedFile().toPath(),"pdf");
             JOptionPane.showMessageDialog(this, Strings.get("dialog.saved"));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("dialog.fail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -1418,7 +1423,7 @@ public final class MainFrame extends JFrame {
         fc.setFileFilter(new FileNameExtensionFilter("Ycscite project", "csl-proj"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
-            ProjectStore.save(fc.getSelectedFile().toPath(), project, result, currentOptions());
+            ProjectStore.save(fc.getSelectedFile().toPath(), project, result, currentOptions(),includeLogo.isSelected());
             JOptionPane.showMessageDialog(this, Strings.get("proj.saved"));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("proj.loadfail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -1441,13 +1446,30 @@ public final class MainFrame extends JFrame {
         spanInitialized=true;
     }
 
+    public void setExportLogo(boolean value){includeLogo.setSelected(value);}
+    /** Shared by the actual export buttons and the editor integration checks. */
+    public void exportVisual(Path path,String format)throws Exception{
+        if(result==null)throw new IllegalStateException("No analyzed network");
+        try(var language=ycscite.I18n.language(Strings.isZh()?"zh":"en")){
+            switch(format){
+                case "png"->{currentCanvas().snapshot(path,1600,1000);Branding.variants(path,includeLogo.isSelected());}
+                case "svg"->{currentCanvas().writeSvg(path,2400,1500);Branding.svgVariants(path,includeLogo.isSelected(),2400,1500);}
+                case "pdf"->{var image=currentCanvas().renderImage(1600,1000);try{PdfExporter.variants(path,image,result.network,project==null?"Ycscite":project.name,includeLogo.isSelected());}finally{image.flush();}}
+                default->throw new IllegalArgumentException("Unknown visual export: "+format);
+            }
+        }
+    }
+    private void exportSvg(){
+        if(result==null)return;var chooser=new JFileChooser();chooser.setSelectedFile(new File("network.svg"));if(chooser.showSaveDialog(this)!=JFileChooser.APPROVE_OPTION)return;
+        try{exportVisual(chooser.getSelectedFile().toPath(),"svg");JOptionPane.showMessageDialog(this,Strings.get("dialog.saved"));}catch(Exception error){JOptionPane.showMessageDialog(this,Strings.get("dialog.fail")+error.getMessage(),"Error",JOptionPane.ERROR_MESSAGE);}
+    }
     private void exportPng() {
         if (result == null) return;
         JFileChooser fc = new JFileChooser();
         fc.setSelectedFile(new File("network.png"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
-            currentCanvas().snapshot(fc.getSelectedFile().toPath(), 1600, 1000);
+            exportVisual(fc.getSelectedFile().toPath(),"png");
             JOptionPane.showMessageDialog(this, Strings.get("dialog.saved"));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("dialog.fail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);

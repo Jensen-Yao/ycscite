@@ -19,7 +19,7 @@ The packaged command is `ycscite-cli.exe`; a development build is `native/target
 | `desktop` | Windows app window |
 | `workbench [inputs...] [--config JSON] [--lang zh/en]` | Interactive node-editing with shared settings; `--project FILE` restores an editable result |
 
-`report` / `analyze`: `--out`, `--config`, `--lang zh|en`, `--no-logo`, `--charts comma,separated,keys`, `--set key=JSON`, `--network`, `--format`, `--from`, `--to`, `--slice-years`, `--g-index-k`, `--pruning`, `--clustering`, `--labeling`.
+`report` / `analyze`: `--out`, `--config`, `--lang zh|en`, `--logo` / `--no-logo`, `--charts comma,separated,keys`, `--set key=JSON`, `--network`, `--format`, `--from`, `--to`, `--slice-years`, `--g-index-k`, `--pruning`, `--clustering`, `--labeling`.
 
 CLI options override a config file. Save `settings.json` beside a generated report to reproduce its configuration. Input/output paths in normal CLI and streaming requests are relative to the process working directory. For `--request` and `batch` files, paths are relative to the request file's directory.
 
@@ -91,3 +91,18 @@ A project restores its stored network without rerunning selection. `--project` c
 `analysis_fingerprint` identifies the included, filtered/deduplicated records in a report or editable project. It can differ from `source_fingerprint`, which identifies the full original parsed corpus. The exported `records.tsv` corresponds to `analysis_fingerprint`.
 
 New record-level TSV files carry an eighteenth `YCSCITE_TSV_V2` header column and a row version value of `2`. Multivalue fields are JSON string arrays, preserving embedded semicolons, tabs, newlines, empty strings and spacing. Scalar fields escape backslash, tab, CR and LF. The reader still supports the original 17-column semicolon-separated format. These are Ycscite record files, not generic Scopus CSV or WoS tagged exports.
+
+## Consistent visual branding
+
+`report` and `analyze` accept mutually exclusive `--logo` / `--no-logo` overrides, including when a settings file has the opposite default. The legacy `engine analyze`, `engine open`, `engine visualize`, directory-batch and search image paths also apply the logo choice to their generated static figures. `workbench --logo` / `workbench --no-logo` overrides an editor config/project preference. Logo flags do not alter the analyzed data.
+
+```powershell
+.\ycscite-cli.exe report papers.ris --config settings.json --logo --out result
+.\ycscite-cli.exe --json engine analyze papers.ris --svg --pdf --no-logo --lang en --out figures
+.\ycscite-cli.exe --json engine open result/projects/keywords.csl-proj --svg --pdf --no-logo --out figures
+.\ycscite-cli.exe workbench --project result/projects/keywords.csl-proj --no-logo
+```
+
+Static PNG/SVG/PDF outputs keep both choices under sibling `with-logo/` and `no-logo/` folders; the named primary file follows the selected preference. PNG variants preserve source RGBA (including transparency), SVG adds only a footer/root-viewport extension, and PDF embeds lossless RGB image streams with aspect-preserving pages. Transparent raster data is composited on white for PDF. Both choices reserve the same footer dimensions so switching never crops chart data. Existing unrelated files in a reused output folder are left alone.
+
+The advanced editor's visual PDF contains the current chart followed by a rasterized, CJK-capable metric summary. SVG is a node/edge overview, not a vector recreation of every specialized chart mode. Empty-data exports create an explanatory image rather than reusing an old file. Video, bibliographic data tables and document summaries are separate output types; these flags cover static PNG/SVG/PDF figures.
