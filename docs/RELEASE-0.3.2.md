@@ -26,7 +26,7 @@
 
 完整解压 `Ycscite-0.3.2-windows-x64.zip`，双击 `Ycscite.exe`。Java 21 运行时已附带；桌面窗口需要系统 WebView2。CLI/headless 不需要浏览器或 WebView2。
 
-客户端与本机服务为 Rust，分析绘图引擎为 Java 21。t-SNE 为图结构探索，UMAP 为近似实现，其他方法的数据条件与限制见 `docs/CAPABILITIES.md`。不宣称像素级复刻 CiteSpace；报告中的期刊引文流不使用 JCR 学科底图。
+客户端与本机服务为 Rust，分析绘图引擎为 Java 21。t-SNE 为图结构探索，UMAP 为近似实现，其他方法的数据条件与限制见 `docs/CAPABILITIES.md`。报告中的期刊引文流来自导入数据中的施引与被引期刊关系；可选期刊底图需要单独配置。
 
 ---
 

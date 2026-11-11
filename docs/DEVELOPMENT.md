@@ -25,7 +25,7 @@ Packaging compiles a fresh engine class directory so stale experiment/test class
 
 `build.cmd` / `build.sh` runs `ycscite.TestAll`, including `ProductTests`. The latter covers mixed formats, settings validation, field inspection, additional views, strict JSON/NDJSON behavior, exact integer IDs, thematic metric definitions, parameter changes, branding variants and optional exports. Rust tests cover local server file boundaries and parameter parsing. `tools/smoke-workspace.py --cli <absolute client path>` checks real local-server persistence across ports, validation, immutable run folders, explicit-report startup and corruption recovery. `tools/smoke-product.py --cli <absolute client path>` exercises the public CLI/headless contract using fictional examples.
 
-Browser QA should verify real control flows, console health, desktop and narrow layouts: import or demo, setting validation, chart/network choice, run/cancel, chart/data tabs, logo toggles and actual downloads, language switch, settings JSON round trip and report history. Merely taking a screenshot or finding nine files is insufficient.
+Browser QA should verify real control flows, console health, desktop and narrow layouts: import or demo, setting validation, chart/network choice, run/cancel, chart/data tabs, logo toggles and actual downloads, language switch, settings JSON round trip and report history. Verify that Generate default nine charts is disabled before import and during a run, generates exactly the standard nine charts in one task, and preserves the current analysis settings and custom batch selection. Single-chart and custom batch actions must continue to generate only their selected charts. Merely taking a screenshot or finding nine files is insufficient.
 
 ## Release
 

@@ -20,7 +20,9 @@
 
 ## Windows 便携版
 
-从 Releases 下载 `Ycscite-0.3.5-windows-x64.zip`，**完整解压**后双击 `Ycscite.exe`。选择文献目录或点击「使用示例」，选中所需图谱，再点击「运行分析」。一次运行只生成当前图；「批量导出」可自行勾选多图。
+从 Releases 下载 `Ycscite-0.3.5-windows-x64.zip`，**完整解压**后双击 `Ycscite.exe`。选择文献目录或点击「使用示例」，选中所需图谱，再点击「运行分析」；「批量导出」可自行勾选多图。
+
+主分支构建新增顶部「一键默认九图」：使用当前数据和分析参数生成完整九图，单图和自选批量入口继续可用。
 
 包内附带精简 Java 21 运行时，无需配置 Java。桌面窗口使用系统 Microsoft Edge WebView2 Runtime。也可以运行 `打开Web工作台.cmd` 在默认浏览器使用；CLI/headless 不需要 WebView2 或浏览器。
 
@@ -64,8 +66,8 @@ Linux/macOS 可用 `bash build.sh` 构建 Java 引擎，CLI/Web 模式通过 Car
 
 ## 方法与数据
 
-图形和表格反映当前输入及设置，不宣称与 CiteSpace 在聚类、布局、突现或像素上完全相同。年度增长、参考文献分散度、实验性引文路径与启发式摘要均有明确的方法说明。图形社区不等同于 LDA 主题模型；可选扩展不会改变默认九图的含义。
+图形和表格由当前导入的文献与分析设置生成，报告保留参数、源数据身份和可核查的数据表。年度增长、参考文献分散度、实验性引文路径与启发式摘要均有明确的方法说明。图形社区不等同于 LDA 主题模型；可选扩展不会改变默认九图的含义。
 
-分析结果保存在本机。CrossRef / OpenAlex 搜索或用户显式配置的远程模型仅在调用对应高级功能时联网。应用不附带 CiteSpace JAR、原版底图或用户研究数据。可选自备期刊底图见 `resources/jcr/README.md`。
+分析结果保存在本机。CrossRef / OpenAlex 搜索或用户显式配置的远程模型仅在调用对应高级功能时联网。Windows 便携包包含 Ycscite 分析引擎与 Java 21 运行环境，完整解压后即可使用。文献数据由用户导入；可选期刊底图的配置见 `resources/jcr/README.md`。
 
 [方法、限制与验证范围](docs/CAPABILITIES.md) · [参考项目能力对照](docs/EXTENSIONS.md) · [构建与发布](docs/DEVELOPMENT.md)

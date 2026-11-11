@@ -7,7 +7,9 @@
 5. **Inspect the result.** The right panel shows relevant metrics, searchable nodes and a reading guide. Select a node for its details. The Data tab provides understandable column names, search and full TSV downloads.
 6. **Export.** PNG is the current chart. PDF contains the figures from that run. SVG is the focus network overview, explicitly labeled in the selector. The logo switch selects a prepared variant without changing chart data.
 
-Batch export is a separate action: select the views and formats you need. There is no mandatory four-view bundle. CLI `analyze` defaults to one network view; `report` retains the nine-chart default. Both accept `--charts` for an explicit selection.
+Generate default nine charts in the command bar uses the imported data and current analysis settings to produce publications, keyword co-occurrence, clusters, time zones, timelines, landscapes, bursts, authors and institutions. It needs no second import or chart-selection dialog. It preserves your analysis parameters and custom batch selection; use Reset in Analysis settings to restore default parameters.
+
+Batch export lets you select any combination of views and formats. CLI `analyze` defaults to one network view; `report` retains the nine-chart default. Both accept `--charts` for an explicit selection.
 
 Changed parameters mark existing charts as needing an update. Run the view to apply them. Analysis history restores saved parameters and results; Open result loads a saved report folder. Settings can be exported as JSON and reused in CLI/headless. Closing the settings dialog discards unapplied changes.
 
@@ -41,7 +43,7 @@ New `records.tsv` exports use a version marker and JSON string arrays for multiv
 
 Label source K uses the selected labeling algorithm. Other document sources (T/A/WC/R/TKA) currently use document-level LLR; the algorithm and source selectors do not imply arbitrary combinations are all implemented.
 
-The advanced editor’s Standard nine-chart report action is a separate file-import workflow using the standard preset. It follows the current interface language and creates a separate result subfolder. Use the main workbench for individually selected views and custom report settings.
+The advanced editor’s Standard nine-chart report action is a separate file-import workflow using the standard preset. It follows the current interface language and creates a separate result subfolder. The main workbench’s Generate default nine charts action reuses the current data and settings. Use the main workbench for individually selected views and custom report settings.
 
 ## Logo choice across static exports
 

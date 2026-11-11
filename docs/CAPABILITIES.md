@@ -58,7 +58,7 @@ The default nine retain their current renderer and their keyword/author/institut
 | `cluster_summary` | Cluster size, silhouette, mean year and label candidates |
 | `year_labels` | Year-by-year cluster labels |
 | `cluster_links` | Undirected links between clusters; no inferred causal direction |
-| `network_growth` | Yearly cumulative nodes, new nodes and new links; **not the full CiteSpace SVA metric family** |
+| `network_growth` | Yearly cumulative nodes, new nodes and new links; the `variation` column is the sum of new nodes and new links, not a modularity-change score |
 | `reference_diversity` | Simplified distribution-based reference diversity; **not citation-context NLP uncertainty** |
 | `citation_path` | Experimental within-dataset citation path/SPC analysis; matching and direction must be checked |
 | `sentences` | Extractive sentences associated with cluster terms |
@@ -73,7 +73,7 @@ The advanced CLI additionally exposes existing geospatial KML, node-list/interop
 
 Regression checks cover parsers, graph metrics on known small graphs, deterministic community detection, file round trips, parameter effects, headless framing/error recovery, paired-logo pixel invariants, export pages and real local UI flows. This is evidence of those tested behaviors, not proof of universal bibliometric validity.
 
-Default sample comparisons continue to differ from the supplied reference in some nodes/edges, cluster composition and burst intervals. No claim of pixel-identical CiteSpace replication is made. LDA, BERTopic, calibrated forecasting, KBCA fusion, and full structural-variation reproduction remain potential independent extensions; they are not advertised as implemented modules.
+Network structure, cluster composition and burst intervals depend on the imported records, preprocessing and analysis parameters. Interpret figures alongside their saved settings and data tables. LDA, BERTopic, calibrated forecasting, KBCA fusion and structural-variation metric families remain potential extensions; they are not advertised as implemented modules.
 
 Reference concepts: Brandes betweenness; Kleinberg bursts; modularity community detection; Dunning likelihood-ratio labels; strategic thematic-map centrality/density. Optional reference-project ideas and deliberate limits are in `EXTENSIONS.md`.
 

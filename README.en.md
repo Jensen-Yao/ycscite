@@ -14,7 +14,9 @@ Features include import diagnostics, 13 named input formats, 10 network types, 3
 
 ## Get started
 
-Download `Ycscite-0.3.5-windows-x64.zip` from Releases and extract the **entire folder**. Launch `Ycscite.exe` or use the browser launcher. Select an individual view and run it; batch export is a separate explicit action. A compact Java 21 runtime is included; the desktop shell uses system Edge WebView2. CLI/headless need neither a browser nor WebView2.
+Download `Ycscite-0.3.5-windows-x64.zip` from Releases and extract the **entire folder**. Launch `Ycscite.exe` or use the browser launcher. Run analysis generates the selected view; Batch export lets you choose any combination. A compact Java 21 runtime is included; the desktop shell uses system Edge WebView2. CLI/headless need neither a browser nor WebView2.
+
+Builds from the main branch also provide Generate default nine charts in the command bar. It uses the current data and analysis settings to produce the complete nine-chart set while preserving individual and custom batch actions.
 
 ```powershell
 .\ycscite-cli.exe --json doctor
@@ -44,7 +46,7 @@ Use `bash build.sh` for the Java engine on Linux/macOS. CLI/Web can be built wit
 
 ## Scope and methods
 
-Ycscite is not affiliated with CiteSpace and does not promise identical clusters, bursts, layouts or pixels. Simplified and experimental analyses are identified in the capability inventory and method notes. Community detection is not probabilistic topic modeling. References, proprietary basemaps and user datasets are not bundled.
+Charts and tables are computed from the imported records and selected settings. Reports retain analysis parameters, source-data identities and auditable tables. Simplified and experimental analyses are identified in the capability inventory and method notes. Community detection is not probabilistic topic modeling. Users import their own literature data and can configure an optional journal basemap; see `resources/jcr/README.md`.
 
 Data and default analysis remain local. Advanced online search and explicitly configured remote-model tools contact their corresponding services only when invoked. See the [method inventory](docs/CAPABILITIES.md), [protocol](docs/HEADLESS.md), and [development guide](docs/DEVELOPMENT.md).
 

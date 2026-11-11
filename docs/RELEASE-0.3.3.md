@@ -30,7 +30,7 @@
 .\ycscite-cli.exe workbench "D:\文献.ris" --config settings.json
 ```
 
-客户端为Rust，分析引擎为Java21。实验性方法与标注词源的实际限制见能力文档，本版不宣称完整复刻或全面优于CiteSpace。
+客户端为 Rust，分析引擎为 Java 21。实验性方法的数据条件、标注词源及验证范围见能力文档。
 
 ---
 

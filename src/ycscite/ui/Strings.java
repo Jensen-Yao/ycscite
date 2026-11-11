@@ -28,7 +28,7 @@ public final class Strings {
         ZH.put("proj.loadfail", "项目加载失败: ");
         ZH.put("proj.loaded", "项目已载入（含分析状态）。");
         ZH.put("sql.hint.found", "已检测到 MySQL Connector/J 驱动：可用直连写入（MySqlStore.storeToServer）。");
-        ZH.put("sql.hint.miss", "未检测到 MySQL 驱动。两种入库方式：\n① 直接执行：mysql -u 用户名 -p -D citespace < 导出的 .sql 文件\n② 直连方式：下载 mysql-connector-j，并以\n   java -cp \"out;mysql-connector-j-8.x.jar\" ycscite.Main\n   启动后即可在程序内直连（本提示将变为\"已检测到驱动\"）。");
+        ZH.put("sql.hint.miss", "未检测到 MySQL 驱动。两种入库方式：\n① 直接执行：mysql -u 用户名 -p -D ycscite < 导出的 .sql 文件\n② 直连方式：下载 mysql-connector-j，并以\n   java -cp \"out;mysql-connector-j-8.x.jar\" ycscite.Main\n   启动后即可在程序内直连（本提示将变为\"已检测到驱动\"）。");
         ZH.put("net.type", "网络类型:");
         ZH.put("net.keyword", "关键词共现");
         ZH.put("net.term", "术语共现（题名/摘要）");
@@ -242,7 +242,7 @@ public final class Strings {
         EN.put("proj.loadfail", "Project load failed: ");
         EN.put("proj.loaded", "Project loaded (with analysis state).");
         EN.put("sql.hint.found", "MySQL Connector/J driver detected: direct store (MySqlStore.storeToServer) available.");
-        EN.put("sql.hint.miss", "No MySQL driver detected. Two ways to load:\n1) Run: mysql -u user -p -D citespace < exported .sql file\n2) Direct mode: download mysql-connector-j and start with\n   java -cp \"out;mysql-connector-j-8.x.jar\" ycscite.Main\n   (this hint will then show the driver as detected).");
+        EN.put("sql.hint.miss", "No MySQL driver detected. Two ways to load:\n1) Run: mysql -u user -p -D ycscite < exported .sql file\n2) Direct mode: download mysql-connector-j and start with\n   java -cp \"out;mysql-connector-j-8.x.jar\" ycscite.Main\n   (this hint will then show the driver as detected).");
         EN.put("net.type", "Network type:");
         EN.put("net.keyword", "Keyword co-occurrence");
         EN.put("net.term", "Term co-occurrence (title/abstract)");

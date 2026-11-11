@@ -311,14 +311,12 @@ public final class MainFrame extends JFrame {
         addUrlItem(tools, "VOSviewer", "https://www.vosviewer.com/");
         addUrlItem(tools, "CitNetExplorer", "https://www.citnetexplorer.nl/");
         addUrlItem(tools, "SCI2", "https://sci2.cns.iu.edu/");
-        addUrlItem(tools, "CiteSpace 101", "https://cpo.ciid.cmu.edu/citespace/");
         mb.add(tools);
         JMenu helpM = new JMenu(Strings.isZh()?"帮助":"Help");
-        addUrlItem(helpM, "How to Use", "https://cpo.ciid.cmu.edu/citespace/how-to-use/");
-        addUrlItem(helpM, "FAQ", "https://cpo.ciid.cmu.edu/citespace/faq/");
-        addUrlItem(helpM, "Video Tutorials", "https://www.youtube.com/playlist?list=PLpEDzH9MgGDS4q6hGfVWFcVbS2B6SCrBv");
-        addUrlItem(helpM, "Twitter", "https://twitter.com/citespace");
-        addUrlItem(helpM, "ResearchGate", "https://www.researchgate.net/project/CiteSpace");
+        addUrlItem(helpM, Strings.isZh()?"使用指南":"User guide", "https://github.com/Jensen-Yao/ycscite/blob/main/docs/USER-GUIDE."+(Strings.isZh()?"zh":"en")+".md");
+        addUrlItem(helpM, Strings.isZh()?"方法与能力":"Methods and capabilities", "https://github.com/Jensen-Yao/ycscite/blob/main/docs/CAPABILITIES.md");
+        addUrlItem(helpM, Strings.isZh()?"版本下载":"Downloads", "https://github.com/Jensen-Yao/ycscite/releases");
+        addUrlItem(helpM, Strings.isZh()?"反馈问题":"Report an issue", "https://github.com/Jensen-Yao/ycscite/issues");
         JMenuItem about = new JMenuItem(Strings.isZh()?"关于 Ycscite":"About Ycscite");
         about.addActionListener(e -> JOptionPane.showMessageDialog(this,
                 "Ycscite "+ycscite.Cli.VERSION+"\n"+(Strings.isZh()?"文献计量与知识图谱分析\n高级窗口可编辑当前网络；方法定义与限制见使用文档。":"Bibliometric and knowledge-network analysis\nEdit the current network here; see the user guide for method definitions and limitations.")));
@@ -1378,7 +1376,7 @@ public final class MainFrame extends JFrame {
     private void exportSqlDump() {
         if (result == null || project == null) return;
         JFileChooser fc = new JFileChooser();
-        fc.setSelectedFile(new File("citespace-clone.sql"));
+        fc.setSelectedFile(new File("ycscite.sql"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
             String db = project.name.replaceAll("[^A-Za-z0-9_]", "_");

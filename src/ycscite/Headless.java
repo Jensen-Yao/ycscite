@@ -110,7 +110,7 @@ public final class Headless {
    Map.of("key","concept_tree","title_zh","术语概念树（启发式）","title_en","Concept tree (heuristic)"),
    Map.of("key","narrative","title_zh","结构化叙事（模板式）","title_en","Structured narrative (template)")));
   inventory.put("project_export",Map.of("actions",List.of("inspect","export"),"views",java.util.stream.Stream.concat(java.util.stream.Stream.of("saved"),ViewState.MODES.stream().sorted().map(name->name.toLowerCase(java.util.Locale.ROOT))).toList(),"formats",List.of("png","svg","pdf","tsv"),"default_formats",List.of("png"),"default_view","saved","default_width",1600,"default_height",1000,"max_pixels",40_000_000,"recomputes_analysis",false));
-  inventory.put("method_notes",List.of("Reference diversity is not full citation-context NLP uncertainty.","Network growth counts new nodes/edges; it is not a validated reproduction of all CiteSpace SVA measures.","Undirected cluster links do not infer dependency direction.","Citation paths and heuristic summaries require independent scientific validation."));
+  inventory.put("method_notes",List.of("Reference diversity is not full citation-context NLP uncertainty.","Network growth reports cumulative nodes, new nodes and new edges by year; its variation value is new_nodes + new_links.","Undirected cluster links do not infer dependency direction.","Citation paths and heuristic summaries require independent scientific validation."));
   return inventory;
  }
 }
