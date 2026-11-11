@@ -1142,7 +1142,7 @@ public final class MainFrame extends JFrame {
 
     private void refresh(String t) {
         // 布局（LinLog 5000 迭代等）在后台线程执行，避免冻结 EDT（审计 P0-2）
-        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));rendering=true;renderFailure=null;
+        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));rendering=true;renderFailure=null;for(var canvas:canvases())canvas.setEnabled(false);
         final ycscite.analysis.Pipeline.Result res = result;
         final Map<String,Object> saved=pendingPresentation;pendingPresentation=Map.of();final var savedCanvases=MiniJson.obj(saved.get("canvases"));
         javax.swing.SwingWorker<Void, Void> worker = new javax.swing.SwingWorker<>() {
@@ -1164,7 +1164,7 @@ public final class MainFrame extends JFrame {
             @Override
             protected void done() {
                 if(res!=result)return;
-                try{get();}catch(Exception error){renderFailure=error;rendering=false;setStatus(Strings.isZh()?"布局失败，请检查参数":"Layout failed; review settings");setCursor(java.awt.Cursor.getDefaultCursor());return;}
+                try{get();}catch(Exception error){renderFailure=error;rendering=false;for(var canvas:canvases())canvas.setEnabled(true);setStatus(Strings.isZh()?"布局失败，请检查参数":"Layout failed; review settings");setCursor(java.awt.Cursor.getDefaultCursor());return;}
                 for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular, heatmap, landscape, umap, circlePack}) {
                     c.setClusterLabels(res.clusterLabels);
                     c.setLabelBudget(labelSlider.getValue());
@@ -1201,7 +1201,7 @@ public final class MainFrame extends JFrame {
                         Strings.get("report.links2"), res.network.edges.size(),
                         res.modularity, Strings.get("report.clusters"),
                         res.clusterStats == null ? 0 : res.clusterStats.size()));
-                setCursor(java.awt.Cursor.getDefaultCursor());rendering=false;
+                setCursor(java.awt.Cursor.getDefaultCursor());rendering=false;for(var canvas:canvases())canvas.setEnabled(true);
             }
         };
         worker.execute();

@@ -178,6 +178,7 @@ public final class GraphCanvas extends JPanel {
             @Override public void componentResized(ComponentEvent e) { if(customCamera)applyCamera();else fitView(); if (network != null) repaint(); }
         });
         addMouseWheelListener(e -> {
+            if(!isEnabled())return;
             double factor = e.getWheelRotation() < 0 ? 1.15 : 1 / 1.15;
             double mx = e.getX(), my = e.getY();
             double previous=zoom;zoom = Math.min(12, Math.max(0.15, zoom * factor));factor=zoom/previous;
@@ -188,17 +189,17 @@ public final class GraphCanvas extends JPanel {
         MouseAdapter pan = new MouseAdapter() {
             Point last;GraphNode dragging;boolean began;
             @Override public void mousePressed(MouseEvent event){
-                if(!SwingUtilities.isLeftMouseButton(event)||mergeSource!=null)return;
+                if(!isEnabled()||!SwingUtilities.isLeftMouseButton(event)||mergeSource!=null)return;
                 last=event.getPoint();dragging=fisheye?null:hitNode(event.getX(),event.getY());began=false;
             }
             @Override public void mouseDragged(MouseEvent event){
-                if(last==null)return;double dx=event.getX()-last.x,dy=event.getY()-last.y;
+                if(!isEnabled()){last=null;dragging=null;return;}if(last==null)return;double dx=event.getX()-last.x,dy=event.getY()-last.y;
                 if(dragging!=null){if(!began&&beforeEdit!=null)beforeEdit.run();began=true;var point=pos.get(dragging);if(point!=null)setNodePosition(dragging.id,point.x+dx/zoom,point.y+dy/zoom);}
                 else {offX+=dx;offY+=dy;rememberCamera();}
                 last=event.getPoint();repaint();
             }
             @Override public void mouseReleased(MouseEvent event){last=null;dragging=null;}
-            @Override public void mouseMoved(MouseEvent event){if(fisheye)setFisheyeFocusAtScreen(event.getX(),event.getY());}
+            @Override public void mouseMoved(MouseEvent event){if(isEnabled()&&fisheye)setFisheyeFocusAtScreen(event.getX(),event.getY());}
         };
         addMouseListener(pan);
         addMouseMotionListener(pan);
@@ -208,6 +209,7 @@ public final class GraphCanvas extends JPanel {
             @Override public void mousePressed(MouseEvent e) { maybePopup(e); }
             @Override public void mouseReleased(MouseEvent e) { maybePopup(e); }
             @Override public void mouseClicked(MouseEvent e) {
+                if(!isEnabled())return;
                 if (SwingUtilities.isLeftMouseButton(e) && mergeSource != null && network != null) {
                     GraphNode t = hitNode(e.getX(), e.getY());
                     if (t != null && t != mergeSource) {
@@ -228,7 +230,7 @@ public final class GraphCanvas extends JPanel {
                 }
             }
             private void maybePopup(MouseEvent e) {
-                if (!e.isPopupTrigger() || network == null) return;
+                if (!isEnabled() || !e.isPopupTrigger() || network == null) return;
                 GraphNode n = hitNode(e.getX(), e.getY());
                 if (n == null) return;
                 JPopupMenu menu = new JPopupMenu(n.label);
