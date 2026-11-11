@@ -30,6 +30,7 @@ def main():
         assert doctor["engine_available"] and doctor["headless"]
         caps = json.loads(run(["capabilities"]).stdout)
         assert caps["version"] == doctor["version"]
+        assert "project" in caps["methods"] and caps["project_export"]["default_formats"]==["png"] and not caps["project_export"]["recomputes_analysis"]
         assert len(caps["charts"]) == 18 and len(caps["formats"]) == 13
         inspection = json.loads(run(["inspect", sample, "--json"]).stdout)
         assert inspection["ok"] and inspection["result"]["records"] == 72

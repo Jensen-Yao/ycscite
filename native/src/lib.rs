@@ -71,12 +71,15 @@ enum ProjectAction {
         path: PathBuf,
         #[arg(long)]
         out: PathBuf,
+        /// saved, merged, timeline, timezone, circular, heatmap, landscape, tsne, umap, circle_pack
         #[arg(long, default_value = "saved")]
         view: String,
         #[arg(long,value_delimiter=',',default_value="png",value_parser=["png","svg","pdf","tsv"])]
         formats: Vec<String>,
+        /// Figure width in pixels, 64–8000; width × height at most 40 million
         #[arg(long, default_value_t = 1600)]
         width: u16,
+        /// Figure height in pixels, 64–8000
         #[arg(long, default_value_t = 1000)]
         height: u16,
         #[arg(long,value_parser=["zh","en"])]
