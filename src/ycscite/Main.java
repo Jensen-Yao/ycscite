@@ -69,7 +69,7 @@ public final class Main {
             return;
         }
         boolean demo = Arrays.stream(args).anyMatch(a -> a.equals("--demo"));
-        var initialInputs=new java.util.ArrayList<String>();String language=null;Path config=null,projectFile=null,smokeOutput=null;Boolean logoOverride=null;
+        var initialInputs=new java.util.ArrayList<String>();String language=null;Path config=null,projectFile=null,smokeOutput=null,smokeEditSettings=null;Boolean logoOverride=null;
         for(int i=0;i<args.length;i++){
             switch(args[i]){
                 case "--input"->{if(++i==args.length)throw new IllegalArgumentException("--input needs a path");initialInputs.add(args[i]);}
@@ -77,6 +77,7 @@ public final class Main {
                 case "--config"->{if(++i==args.length)throw new IllegalArgumentException("--config needs a file");config=Path.of(args[i]);}
                 case "--project"->{if(++i==args.length)throw new IllegalArgumentException("--project needs a file");projectFile=Path.of(args[i]);}
                 case "--smoke-output"->{if(++i==args.length)throw new IllegalArgumentException("--smoke-output needs a directory");smokeOutput=Path.of(args[i]);}
+                case "--smoke-edit-settings"->{if(++i==args.length)throw new IllegalArgumentException("--smoke-edit-settings needs a file");smokeEditSettings=Path.of(args[i]);}
                 case "--logo"->{if(Boolean.FALSE.equals(logoOverride))throw new IllegalArgumentException("Choose --logo or --no-logo");logoOverride=true;}
                 case "--no-logo"->{if(Boolean.TRUE.equals(logoOverride))throw new IllegalArgumentException("Choose --logo or --no-logo");logoOverride=false;}
                 case "--demo"->{}
@@ -85,13 +86,14 @@ public final class Main {
         }
         if(projectFile!=null&&(!initialInputs.isEmpty()||config!=null||demo))throw new IllegalArgumentException("--project cannot be combined with input, config or demo");
         final Settings startupSettings=config==null?null:Settings.read(config);
-        String chosenLanguage=language!=null?language:startupSettings!=null?startupSettings.text("language"):"zh";
+        final ProjectStore.Bundle startupBundle=projectFile==null?null:ProjectStore.load(projectFile);
+        String chosenLanguage=language!=null?language:startupSettings!=null?startupSettings.text("language"):startupBundle!=null?java.util.Objects.toString(startupBundle.presentation.get("language"),startupBundle.viewDefaults!=null?startupBundle.viewDefaults.text("language"):"zh"):"zh";
         if(!java.util.Set.of("zh","en").contains(chosenLanguage))throw new IllegalArgumentException("Language must be zh or en");
         ycscite.ui.Strings.setLang(chosenLanguage.equals("en")?ycscite.ui.Strings.Lang.EN:ycscite.ui.Strings.Lang.ZH);
-        final ProjectStore.Bundle startupBundle=projectFile==null?null:ProjectStore.load(projectFile);
         Project loaded=initialInputs.isEmpty()?(demo?DemoData.generate(120):null):Cli.loadInputs(initialInputs,startupSettings==null?"auto":startupSettings.text("format"));
         final Project initial=loaded!=null&&startupSettings!=null?NineFigureReport.prepare(loaded,startupSettings).project():loaded;
         final Path diagnostics=smokeOutput;final Boolean requestedLogo=logoOverride;
+        if(smokeEditSettings!=null&&diagnostics==null)throw new IllegalArgumentException("--smoke-edit-settings requires --smoke-output");final Settings pendingSmoke=smokeEditSettings==null?null:Settings.read(smokeEditSettings);
         // 启动画面（闪屏 1.2 秒）
         JWindow splash = new JWindow();
         splash.setSize(420, 260);
@@ -140,6 +142,7 @@ public final class Main {
             if(requestedLogo!=null)frame.setExportLogo(requestedLogo);
             frame.setVisible(true);
             if(diagnostics!=null){var capture=new javax.swing.Timer(100,event->{if(frame.isRendering())return;((javax.swing.Timer)event.getSource()).stop();try{
+                if(pendingSmoke!=null)frame.applySettings(pendingSmoke);
                 if(frame.renderFailure()!=null)throw new IllegalStateException("Editor layout failed",frame.renderFailure());
                 Files.createDirectories(diagnostics);
                 var image=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);
@@ -147,6 +150,7 @@ public final class Main {
                 frame.saveDiagnostics(diagnostics);
                 var layout=(java.awt.BorderLayout)frame.getContentPane().getLayout();var west=(javax.swing.JTabbedPane)layout.getLayoutComponent(java.awt.BorderLayout.WEST);west.setSelectedIndex(west.getTabCount()-1);frame.validate();
                 var controls=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);var drawing=controls.createGraphics();frame.paint(drawing);drawing.dispose();javax.imageio.ImageIO.write(controls,"png",diagnostics.resolve("export-controls.png").toFile());
+                west.setSelectedIndex(2);frame.validate();var displayImage=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);var displayGraphics=displayImage.createGraphics();frame.paint(displayGraphics);displayGraphics.dispose();javax.imageio.ImageIO.write(displayImage,"png",diagnostics.resolve("display-controls.png").toFile());
                 frame.dispose();System.exit(0);
             }catch(Exception error){error.printStackTrace();frame.dispose();System.exit(1);}});capture.start();}
         });

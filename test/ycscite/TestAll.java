@@ -1348,7 +1348,7 @@ public final class TestAll {
         c.setLabelAngle(45);
         c.setConvexHull(true);
         c.renderImage(600, 400);
-        check("fisheye.render", c.isFisheye() && c.getLabelAngle() == 0 && c.isConvexHull(), "state");
+        check("fisheye.render", c.isFisheye() && c.getLabelAngle() == 45 && c.isConvexHull(), "state");
 
         // 引文变体合并：CitedRef.parse 已把同“作者,年,期刊”归一（V57/V58 两条 J ASIST 为一键），
         // 网络中 SMITH 变体 = {J ASIST, J AM SOC...} 2 个 + LEE 1 个 = 3；归并后 SMITH×1 + LEE = 2

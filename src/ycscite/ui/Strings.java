@@ -13,6 +13,8 @@ public final class Strings {
     private static final Map<String, String> EN = new HashMap<>();
 
     static {
+        ZH.put("disp.fit","适应窗口");EN.put("disp.fit","Fit to window");ZH.put("disp.showall","显示全部节点");EN.put("disp.showall","Show all nodes");
+        ZH.put("disp.movehint","拖动节点调整位置，拖动空白平移。时间视图仅允许纵向调整。保存项目可保留各视图。");EN.put("disp.movehint","Drag a node to move it; drag the background to pan. Time views allow vertical moves only. Save the project to retain each view.");
         ZH.put("export.logo","图片中显示 Logo");EN.put("export.logo","Include logo in visual exports");
         ZH.put("export.logo.hint","PNG、SVG、PDF 使用独立页脚，不覆盖图形数据。");EN.put("export.logo.hint","PNG, SVG and PDF use a separate footer; chart data remains intact.");
         ZH.put("export.svg","导出网络 SVG…");EN.put("export.svg","Export network SVG…");
@@ -22,7 +24,7 @@ public final class Strings {
         ZH.put("menu.exit", "退出");
         ZH.put("menu.openproj", "打开项目…");
         ZH.put("menu.saveproj", "保存项目…");
-        ZH.put("proj.saved", "项目已保存。");
+        ZH.put("proj.saved", "项目与当前视图已保存。");
         ZH.put("proj.loadfail", "项目加载失败: ");
         ZH.put("proj.loaded", "项目已载入（含分析状态）。");
         ZH.put("sql.hint.found", "已检测到 MySQL Connector/J 驱动：可用直连写入（MySqlStore.storeToServer）。");
@@ -236,7 +238,7 @@ public final class Strings {
         EN.put("menu.exit", "Exit");
         EN.put("menu.openproj", "Open project…");
         EN.put("menu.saveproj", "Save project…");
-        EN.put("proj.saved", "Project saved.");
+        EN.put("proj.saved", "Project and visual state saved.");
         EN.put("proj.loadfail", "Project load failed: ");
         EN.put("proj.loaded", "Project loaded (with analysis state).");
         EN.put("sql.hint.found", "MySQL Connector/J driver detected: direct store (MySqlStore.storeToServer) available.");
@@ -394,7 +396,7 @@ public final class Strings {
         EN.put("largest.cc", "Largest K components (0=all):");
         EN.put("singular", "Keywords plural→singular");
         EN.put("canvas.nodes", " nodes, "); EN.put("canvas.links", " links  ");
-        EN.put("canvas.hint", "| wheel=zoom drag=pan hover=details");
+        EN.put("canvas.hint", "| wheel: zoom · drag node: move · background: pan");
         EN.put("mode.timeline", "Timeline"); EN.put("mode.timezone", "Timezone"); EN.put("mode.merged", "Merged");
         EN.put("legend.clusters", "Clusters");
         EN.put("legend.years", "Years (node ring colors)");

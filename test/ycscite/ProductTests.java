@@ -11,6 +11,7 @@ public final class ProductTests {
  public static void run()throws Exception{
   ProjectFidelityTests.run();
   VisualExportTests.run();
+  PresentationTests.run();
   Path root=Files.createTempDirectory("ycscite-product-");
   Path mixed=Files.createDirectory(root.resolve("mixed"));
   Files.writeString(mixed.resolve("note.txt"),"README, not bibliographic data");

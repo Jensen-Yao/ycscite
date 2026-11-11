@@ -29,17 +29,28 @@ public final class ProjectStore {
         public Pipeline.Result result;   // null when saved without analysis
         public Pipeline.Options options;
         public Boolean exportLogo;
+        public Map<String,Object> presentation=Map.of();
+        public ycscite.Settings viewDefaults;
     }
 
-    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o) throws IOException {save(file,p,r,o,null);}
-    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o,boolean logo)throws IOException{save(file,p,r,o,Boolean.valueOf(logo));}
-    private static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o,Boolean logo)throws IOException {
+    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o) throws IOException {save(file,p,r,o,null,Map.of(),null);}
+    public static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o,boolean logo)throws IOException{save(file,p,r,o,Boolean.valueOf(logo),Map.of(),null);}
+    public static void save(Path file,Project p,Pipeline.Result r,Pipeline.Options o,boolean logo,Map<String,Object> presentation)throws IOException{save(file,p,r,o,Boolean.valueOf(logo),presentation,null);}
+    public static void saveFromReport(Path file,Project project,Pipeline.Result result,Pipeline.Options options,ycscite.Settings settings)throws IOException{save(file,project,result,options,settings.bool("logo"),Map.of(),settings);}
+    private static void save(Path file, Project p, Pipeline.Result r, Pipeline.Options o,Boolean logo,Map<String,Object> presentation,ycscite.Settings defaults)throws IOException {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("format", FORMAT);
         root.put("project", projectJson(p));
         if(logo!=null)root.put("exportLogo",logo);
+        if(defaults!=null)root.put("viewDefaults",defaults.map());
+        if(!presentation.isEmpty()){if(r==null)throw new IOException("A saved view requires an analyzed network");root.put("presentation",ViewState.editor(presentation,r.network));}
         if (r != null) root.put("analysis", analysisJson(r, o));
-        Files.writeString(file, MiniJson.write(root), StandardCharsets.UTF_8);
+        Path target=file.toAbsolutePath().normalize();Path staged=Files.createTempFile(target.getParent(),"ycscite-project-",".new");
+        try{
+            Files.writeString(staged,MiniJson.write(root),StandardCharsets.UTF_8);
+            try{Files.move(staged,target,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+            catch(java.nio.file.AtomicMoveNotSupportedException error){Files.move(staged,target,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+        }finally{Files.deleteIfExists(staged);}
     }
 
     public static Bundle load(Path file) throws IOException {
@@ -49,13 +60,25 @@ public final class ProjectStore {
         Bundle b = new Bundle();
         b.project = projectFrom(MiniJson.obj(root.get("project")));
         b.exportLogo=root.get("exportLogo") instanceof Boolean logo?logo:null;
+        if(root.containsKey("viewDefaults"))b.viewDefaults=new ycscite.Settings(ViewState.object(root.get("viewDefaults"),"viewDefaults"));
         Object analysis = root.get("analysis");
         if (analysis != null) {
             b.options = new Pipeline.Options();
             b.result = new Pipeline.Result();
             analysisFrom(MiniJson.obj(analysis), b);
         }
+        if(root.containsKey("presentation")){if(b.result==null)throw new IOException("Saved view has no analyzed network");b.presentation=ViewState.editor(root.get("presentation"),b.result.network);}
         return b;
+    }
+
+    /** Deterministic identity of all retained node data and undirected edge data, independent of insertion order. */
+    public static String networkFingerprint(ycscite.model.Network graph){
+        try{
+            var nodes=graph.nodeCollection().stream().sorted(java.util.Comparator.comparing(n->n.id)).map(ProjectStore::nodeJson).toList();
+            var edges=graph.edges.stream().map(e->java.util.List.of(e.a.id.compareTo(e.b.id)<=0?e.a.id:e.b.id,e.a.id.compareTo(e.b.id)<=0?e.b.id:e.a.id,Integer.toString(e.weight),Integer.toString(e.firstYear))).sorted(java.util.Comparator.comparing(MiniJson::write)).toList();
+            byte[] bytes=MiniJson.write(java.util.List.of("ycscite-network-v1",graph.kind,graph.minYear,graph.maxYear,nodes,edges)).getBytes(StandardCharsets.UTF_8);
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        }catch(java.security.NoSuchAlgorithmException error){throw new IllegalStateException(error);}
     }
 
     /** Independent editable analysis state, including its metrics/labels, for undo. */

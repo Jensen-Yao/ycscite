@@ -63,6 +63,31 @@ struct AnalysisArgs {
     labeling: Option<String>,
 }
 #[derive(Subcommand)]
+enum ProjectAction {
+    /// Read a project network and its saved visual state without recomputation
+    Inspect { path: PathBuf },
+    /// Export the saved layout and visual settings without opening a GUI
+    Export {
+        path: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, default_value = "saved")]
+        view: String,
+        #[arg(long,value_delimiter=',',default_value="png",value_parser=["png","svg","pdf","tsv"])]
+        formats: Vec<String>,
+        #[arg(long, default_value_t = 1600)]
+        width: u16,
+        #[arg(long, default_value_t = 1000)]
+        height: u16,
+        #[arg(long,value_parser=["zh","en"])]
+        lang: Option<String>,
+        #[arg(long, conflicts_with = "no_logo")]
+        logo: bool,
+        #[arg(long, conflicts_with = "logo")]
+        no_logo: bool,
+    },
+}
+#[derive(Subcommand)]
 enum Action {
     /// Configurable publication report (default: nine charts)
     Report(AnalysisArgs),
@@ -74,6 +99,11 @@ enum Action {
         inputs: Vec<PathBuf>,
         #[arg(long, default_value = "auto")]
         format: String,
+    },
+    /// Inspect or export an editable project without GUI or analysis recomputation
+    Project {
+        #[command(subcommand)]
+        command: ProjectAction,
     },
     /// Query supported formats, charts, methods and default settings
     Capabilities,
@@ -168,6 +198,40 @@ pub fn cli() -> i32 {
             }
             Err(e) => fail(e, cli.json),
         },
+        Action::Project { command } => {
+            let params = match command {
+                ProjectAction::Inspect { path } => json!({"action":"inspect","path":path}),
+                ProjectAction::Export {
+                    path,
+                    out,
+                    view,
+                    formats,
+                    width,
+                    height,
+                    lang,
+                    logo,
+                    no_logo,
+                } => {
+                    let mut value = json!({"action":"export","path":path,"output":out,"view":view,"formats":formats,"width":width,"height":height});
+                    if let Some(language) = lang {
+                        value["language"] = json!(language);
+                    }
+                    if logo || no_logo {
+                        value["logo"] = json!(logo);
+                    }
+                    value
+                }
+            };
+            match engine::Engine::find().and_then(|engine| {
+                engine.request(json!({"id":1,"method":"project","params":params}))
+            }) {
+                Ok(response) => {
+                    println!("{response}");
+                    if response["ok"] == true { 0 } else { 1 }
+                }
+                Err(error) => fail(error, cli.json),
+            }
+        }
         Action::Headless { request } => {
             let result = (|| -> Result<i32, String> {
                 let e = engine::Engine::find()?;
@@ -504,6 +568,40 @@ pub fn desktop() -> Result<(), String> {
 #[cfg(test)]
 mod cli_tests {
     use super::*;
+    #[test]
+    fn project_exports_choose_outputs_explicitly() {
+        assert!(Cli::try_parse_from(["ycscite", "project", "inspect", "saved.csl-proj"]).is_ok());
+        assert!(
+            Cli::try_parse_from([
+                "ycscite",
+                "project",
+                "export",
+                "saved.csl-proj",
+                "--out",
+                "images",
+                "--formats",
+                "png,svg,pdf,tsv",
+                "--view",
+                "saved",
+                "--no-logo"
+            ])
+            .is_ok()
+        );
+        assert!(Cli::try_parse_from(["ycscite", "project", "export", "saved.csl-proj"]).is_err());
+        assert!(
+            Cli::try_parse_from([
+                "ycscite",
+                "project",
+                "export",
+                "saved.csl-proj",
+                "--out",
+                "images",
+                "--logo",
+                "--no-logo"
+            ])
+            .is_err()
+        );
+    }
     #[test]
     fn analysis_logo_override_is_unambiguous() {
         assert!(Cli::try_parse_from(["ycscite", "report", "input.ris", "--logo"]).is_ok());

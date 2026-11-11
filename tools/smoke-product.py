@@ -86,6 +86,22 @@ def main():
         legacy_stream = run(["headless"], stdin=json.dumps({"id":"logo", "method":"cli", "params":{"arguments":["open", str(project), "--svg", "--logo", "--lang", "en", "--out", str(logo_override)]}}) + "\n")
         assert json.loads(legacy_stream.stdout)["ok"]
         assert (logo_override / "network.svg").read_bytes() == (logo_override / "with-logo/network.svg").read_bytes()
+        inspected_project=json.loads(run(["project","inspect",project]).stdout)
+        assert inspected_project["ok"] and inspected_project["result"]["nodes"]==next(n["nodes"] for n in manifest["networks"] if n["kind"]=="keywords")
+        projected=work/"first-class-project"
+        project_export=json.loads(run(["project","export",project,"--out",projected,"--formats","png,svg,pdf,tsv","--no-logo","--lang","en"]).stdout)
+        assert project_export["ok"] and project_export["result"]["manifest"]["view"]=="MERGED" and not project_export["result"]["manifest"]["restored_saved_view"]
+        assert all((projected/item["file"]).is_file() for item in project_export["result"]["manifest"]["artifacts"])
+        assert (projected/"network.png").read_bytes()==(projected/"no-logo/network.png").read_bytes()
+        assert (projected/"report.pdf").read_bytes()==(projected/"no-logo/report.pdf").read_bytes()
+        shutil.copyfile(project,work/"saved-project.csl-proj")
+        project_request={"id":"restore", "method":"project", "params":{"action":"export", "path":"saved-project.csl-proj", "output":"relative-project-export", "formats":["png"],"logo":False}}
+        (work/"project-request.json").write_text(json.dumps(project_request),encoding="utf-8")
+        assert json.loads(run(["headless","--request",work/"project-request.json"]).stdout)["ok"]
+        assert (work/"relative-project-export/network.png").is_file()
+        invalid_out=work/"invalid-project-view"
+        assert not json.loads(run(["project","export",project,"--out",invalid_out,"--view","not-a-view"],expected=1).stdout)["ok"]
+        assert not invalid_out.exists()
         requests = [
             '{"id":9007199254740993,"method":"capabilities"}',
             '{broken',
@@ -111,7 +127,7 @@ def main():
         run(["report", work / "missing.txt", "--json"], expected=1)
         print(json.dumps({"ok":True,"charts":18,"formats":13,"records":72,
                           "checks":["unrelated-cwd", "config", "all-charts", "all-analysis-tables", "all-exports",
-                                    "logo-variants", "legacy-and-project-logo", "headless-logo-override", "lossless-pdf", "pdf-pages", "editable-projects", "lossless-records-tsv", "ndjson-framing", "integer-id", "error-recovery",
+                                    "logo-variants", "legacy-and-project-logo", "headless-logo-override", "lossless-pdf", "pdf-pages", "editable-projects", "first-class-project-inspection", "gui-free-project-export", "relative-project-request", "lossless-records-tsv", "ndjson-framing", "integer-id", "error-recovery",
                                     "batch-isolation", "request-relative-paths", "exit-codes"]}, ensure_ascii=False))
 
 

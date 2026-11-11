@@ -4,6 +4,9 @@ import ycscite.analysis.LLRLabeler;
 import ycscite.model.GraphEdge;
 import ycscite.model.GraphNode;
 import ycscite.model.Network;
+import ycscite.io.MiniJson;
+import ycscite.io.ViewState;
+import ycscite.io.ProjectStore;
 
 import javax.swing.*;
 import java.awt.*;
@@ -162,34 +165,40 @@ public final class GraphCanvas extends JPanel {
     private Runnable networkChanged;
     private Runnable beforeEdit;             // 编辑动作前调用（撤销快照）
     private double zoom = 1, offX = 0, offY = 0;
+    private boolean customCamera=false,restoredPositions=false;
+    private double cameraScale=1,cameraX=WORLD_W/2,cameraY=WORLD_H/2;
+    private void rememberCamera(){double width=getWidth()>0?getWidth():WORLD_W,height=getHeight()>0?getHeight():WORLD_H;double fit=Math.min(width/WORLD_W,height/WORLD_H);cameraScale=zoom/Math.max(.001,fit);cameraX=(width/2-offX)/zoom;cameraY=(height/2-offY)/zoom;customCamera=true;}
+    private void applyCamera(){double width=getWidth()>0?getWidth():WORLD_W,height=getHeight()>0?getHeight():WORLD_H;zoom=cameraScale*Math.min(width/WORLD_W,height/WORLD_H);offX=width/2-cameraX*zoom;offY=height/2-cameraY*zoom;}
+
 
     public GraphCanvas() {
         setBackground(new Color(17, 17, 17));
         setToolTipText("");
         addComponentListener(new ComponentAdapter() {
-            @Override public void componentResized(ComponentEvent e) { fitView(); if (network != null) repaint(); }
+            @Override public void componentResized(ComponentEvent e) { if(customCamera)applyCamera();else fitView(); if (network != null) repaint(); }
         });
         addMouseWheelListener(e -> {
             double factor = e.getWheelRotation() < 0 ? 1.15 : 1 / 1.15;
             double mx = e.getX(), my = e.getY();
-            zoom = Math.min(12, Math.max(0.15, zoom * factor));
+            double previous=zoom;zoom = Math.min(12, Math.max(0.15, zoom * factor));factor=zoom/previous;
             offX = mx - (mx - offX) * factor;
-            offY = my - (my - offY) * factor;
+            offY = my - (my - offY) * factor;rememberCamera();
             repaint();
         });
         MouseAdapter pan = new MouseAdapter() {
-            Point last;
-            @Override public void mousePressed(MouseEvent e) { last = e.getPoint(); }
-            @Override public void mouseDragged(MouseEvent e) {
-                if (last == null) return;
-                offX += e.getX() - last.x;
-                offY += e.getY() - last.y;
-                last = e.getPoint();
-                repaint();
+            Point last;GraphNode dragging;boolean began;
+            @Override public void mousePressed(MouseEvent event){
+                if(!SwingUtilities.isLeftMouseButton(event)||mergeSource!=null)return;
+                last=event.getPoint();dragging=fisheye?null:hitNode(event.getX(),event.getY());began=false;
             }
-            @Override public void mouseMoved(MouseEvent e) {
-                if (fisheye) setFisheyeFocusAtScreen(e.getX(), e.getY());
+            @Override public void mouseDragged(MouseEvent event){
+                if(last==null)return;double dx=event.getX()-last.x,dy=event.getY()-last.y;
+                if(dragging!=null){if(!began&&beforeEdit!=null)beforeEdit.run();began=true;var point=pos.get(dragging);if(point!=null)setNodePosition(dragging.id,point.x+dx/zoom,point.y+dy/zoom);}
+                else {offX+=dx;offY+=dy;rememberCamera();}
+                last=event.getPoint();repaint();
             }
+            @Override public void mouseReleased(MouseEvent event){last=null;dragging=null;}
+            @Override public void mouseMoved(MouseEvent event){if(fisheye)setFisheyeFocusAtScreen(event.getX(),event.getY());}
         };
         addMouseListener(pan);
         addMouseMotionListener(pan);
@@ -231,15 +240,15 @@ public final class GraphCanvas extends JPanel {
                 JMenuItem expand = new JMenuItem(expandedNode == n ? Strings.get("ctx.collapse") : Strings.get("ctx.expand"));
                 expand.addActionListener(ev -> { expandedNode = expandedNode == n ? null : n; repaint(); });
                 JMenuItem filter = new JMenuItem(Strings.get("ctx.filter"));
-                filter.addActionListener(ev -> { if (beforeEdit != null) beforeEdit.run(); hiddenNodes.add(n); afterEdit(); });
+                filter.addActionListener(ev -> { if (beforeEdit != null) beforeEdit.run(); hiddenNodes.add(n); repaint(); });
                 JMenuItem hideCluster = new JMenuItem(Strings.get("ctx.hidecluster"));
                 hideCluster.addActionListener(ev -> {
                     if (beforeEdit != null) beforeEdit.run();
                     for (GraphNode m : network.nodeCollection()) if (m.cluster == n.cluster) hiddenNodes.add(m);
-                    afterEdit();
+                    repaint();
                 });
                 JMenuItem restore = new JMenuItem(Strings.get("ctx.restore"));
-                restore.addActionListener(ev -> { hiddenNodes.clear(); afterEdit(); });
+                restore.addActionListener(ev -> {if(beforeEdit!=null)beforeEdit.run();hiddenNodes.clear();repaint();});
                 JMenuItem exclude = new JMenuItem(Strings.get("ctx.exclude"));
                 exclude.addActionListener(ev -> {
                     if (beforeEdit != null) beforeEdit.run();
@@ -250,11 +259,11 @@ public final class GraphCanvas extends JPanel {
                 delete.addActionListener(ev -> { if (beforeEdit != null) beforeEdit.run(); network.removeNode(n); afterEdit(); });
                 JMenuItem details = new JMenuItem(Strings.get("ctx.details"));
                 JMenuItem bookmark = new JMenuItem(n.bookmarked ? Strings.get("ctx.unbookmark") : Strings.get("ctx.bookmark"));
-                bookmark.addActionListener(ev -> { n.bookmarked = !n.bookmarked; repaint(); });
+                bookmark.addActionListener(ev -> { if(beforeEdit!=null)beforeEdit.run();n.bookmarked = !n.bookmarked; repaint(); });
                 JMenuItem annotate = new JMenuItem(Strings.get("ctx.annotate"));
                 annotate.addActionListener(ev -> {
                     String txt = JOptionPane.showInputDialog(GraphCanvas.this, Strings.get("ctx.annotate.prompt"), n.annotation);
-                    if (txt != null) { n.annotation = txt; repaint(); }
+                    if (txt != null) {if(beforeEdit!=null)beforeEdit.run();n.annotation = txt; repaint(); }
                 });
                 JMenuItem rename = new JMenuItem(Strings.get("ctx.rename"));
                 JMenuItem similar = new JMenuItem(Strings.get("ctx.similar"));
@@ -283,7 +292,7 @@ public final class GraphCanvas extends JPanel {
                 });
                 rename.addActionListener(ev -> {
                     String txt = JOptionPane.showInputDialog(GraphCanvas.this, Strings.get("ctx.rename.prompt"), n.userLabel == null ? n.label : n.userLabel);
-                    if (txt != null && !txt.isBlank()) { n.userLabel = txt; repaint(); }
+                    if (txt != null && !txt.isBlank()) {if(beforeEdit!=null)beforeEdit.run();n.userLabel = txt; repaint(); }
                 });
                 details.addActionListener(ev -> {
                     selectedNode = n;
@@ -356,7 +365,7 @@ public final class GraphCanvas extends JPanel {
         this.fisheyeFocusY = w.y;
         if (fisheye) repaint();
     }
-    public void setLabelAngle(int deg) { this.labelAngle = 0; repaint(); }
+    public void setLabelAngle(int deg) { this.labelAngle = Math.clamp(deg,-180,180); repaint(); }
     public int getLabelAngle() { return labelAngle; }
     public void setConvexHull(boolean on) { this.convexHull = on; repaint(); }
     public boolean isConvexHull() { return convexHull; }
@@ -537,7 +546,7 @@ public final class GraphCanvas extends JPanel {
     public void setLayoutAlgo(LayoutAlgo a) { layoutAlgo = a; computeLayout(); repaint(); }
     public LayoutAlgo getLayoutAlgo() { return layoutAlgo; }
 
-    public void setNodeScale(double s) { nodeScale = Math.max(0.3, Math.min(3.0, s)); repaint(); }
+    public void setNodeScale(double s) { nodeScale = Math.max(0.25, Math.min(4.0, s)); repaint(); }
     public void setKcoreHighlight(int k) { kcoreHighlight = k; repaint(); }
     public void setLinkSingleColor(boolean on) { linkSingleColor = on; repaint(); }
     public void setShowPubType(boolean on) { showPubType = on; repaint(); }
@@ -591,18 +600,120 @@ public final class GraphCanvas extends JPanel {
 
     // ---------- public API ----------
 
-    public void show(Network n, Mode m, String title) {
-        this.network = n;
-        this.mode = m;
-        this.title = title;
-        computeLayout();
-        fitView();
-        repaint();
+    public void show(Network graph,Mode mode,String title){show(graph,mode,title,null);}
+    public void show(Network graph,Mode mode,String title,Map<String,Object> saved){
+        Map<String,Object> checked=saved==null?null:ViewState.checked(saved,graph,mode.name());
+        this.network=graph;this.mode=mode;this.title=title;hiddenNodes.clear();focusNode=null;selectedNode=null;expandedNode=null;highlightCluster=Integer.MIN_VALUE;yearCutoff=Integer.MAX_VALUE;customCamera=false;restoredPositions=false;
+        if(checked==null){computeLayout();fitView();}else restoreState(checked);repaint();
     }
+    /** Captures final coordinates and display values; no executable code or external file references. */
+    public Map<String,Object> captureState(){
+        if(network==null)throw new IllegalStateException("No analyzed network");
+        var state=new LinkedHashMap<String,Object>();state.put("schema_version",1);state.put("network_fingerprint",ProjectStore.networkFingerprint(network));state.put("mode",mode.name());state.put("title",title);
+        var points=new LinkedHashMap<String,Object>();for(var node:network.nodeCollection()){var point=pos.get(node);if(point!=null)points.put(node.id,List.of(point.x,point.y));}state.put("positions",points);
+        var spans=new LinkedHashMap<String,Object>();for(var entry:bands.entrySet())spans.put(Integer.toString(entry.getKey()),List.of(entry.getValue()[0],entry.getValue()[1]));state.put("bands",spans);
+        var display=new LinkedHashMap<String,Object>();
+        display.put("fisheye",fisheye);
+        display.put("convex_hull",convexHull);
+        display.put("original_style",originalStyle);
+        display.put("weighted_links",linkWeightedWidth);
+        display.put("curved_links",curvedLines);
+        display.put("cluster_links",linkColorByCluster);
+        display.put("effects_3d",effects3d);
+        display.put("link_labels",linkLabels);
+        display.put("cluster_ids",showClusterId);
+        display.put("citation_counts",showCitationCount);
+        display.put("cluster_label_colors",labelColorByCluster);
+        display.put("single_color_links",linkSingleColor);
+        display.put("publication_types",showPubType);
+        display.put("label_shadow",labelShadow);
+        display.put("transparent",transparentBg);
+        display.put("theme",theme.name());
+        display.put("size_mode",sizeMode.name());
+        display.put("shape",nodeShape.name());
+        display.put("layout",layoutAlgo.name());
+        display.put("label_budget",labelBudget);
+        display.put("font_size",Double.parseDouble(Float.toString(labelFontSize)));
+        display.put("label_angle",labelAngle);
+        display.put("node_scale",nodeScale);
+        display.put("link_opacity",Double.parseDouble(Float.toString(linkTransparency)));
+        display.put("kcore",kcoreHighlight);
+        display.put("fill_pattern",hullFillPattern);
+        display.put("label_attempts",labelPlacementRate);
+        display.put("fisheye_x",fisheyeFocusX);
+        display.put("fisheye_y",fisheyeFocusY);
+        display.put("fisheye_strength",fisheyeStrength);
+        display.put("cluster_label_bg",clusterLabelBg==null?null:clusterLabelBg.getRGB());
+        display.put("article_label_bg",articleLabelBg==null?null:articleLabelBg.getRGB());
+        display.put("term_label_bg",termLabelBg==null?null:termLabelBg.getRGB());
+        display.put("overlay_label_bg",overlayLabelBg==null?null:overlayLabelBg.getRGB());
+        state.put("display",display);
+        double width=getWidth()>0?getWidth():WORLD_W,height=getHeight()>0?getHeight():WORLD_H,fit=Math.min(width/WORLD_W,height/WORLD_H);
+        state.put("camera",Map.of("scale",customCamera?cameraScale:zoom/Math.max(.001,fit),"center_x",customCamera?cameraX:(width/2-offX)/zoom,"center_y",customCamera?cameraY:(height/2-offY)/zoom));
+        state.put("hidden",hiddenNodes.stream().map(n->n.id).sorted().toList());state.put("focus",focusNode==null?null:focusNode.id);state.put("selected",selectedNode==null?null:selectedNode.id);state.put("expanded",expandedNode==null?null:expandedNode.id);
+        state.put("highlight_cluster",highlightCluster);state.put("highlights",new ArrayList<>(new TreeSet<>(highlightIds)));state.put("year_cutoff",yearCutoff);
+        state.put("overlays",overlayEdges.stream().map(edge->List.of(edge[0],edge[1])).toList());state.put("overlay_keys",new ArrayList<>(new TreeSet<>(overlayKeys)));state.put("parameter_lines",new ArrayList<>(paramPanel));
+        return ViewState.checked(state,network,mode.name());
+    }
+    public void restoreState(Map<String,Object> value){
+        var state=ViewState.checked(value,network,mode.name());var display=MiniJson.obj(state.get("display"));
+        fisheye=(Boolean)display.get("fisheye");
+        convexHull=(Boolean)display.get("convex_hull");
+        originalStyle=(Boolean)display.get("original_style");
+        linkWeightedWidth=(Boolean)display.get("weighted_links");
+        curvedLines=(Boolean)display.get("curved_links");
+        linkColorByCluster=(Boolean)display.get("cluster_links");
+        effects3d=(Boolean)display.get("effects_3d");
+        linkLabels=(Boolean)display.get("link_labels");
+        showClusterId=(Boolean)display.get("cluster_ids");
+        showCitationCount=(Boolean)display.get("citation_counts");
+        labelColorByCluster=(Boolean)display.get("cluster_label_colors");
+        linkSingleColor=(Boolean)display.get("single_color_links");
+        showPubType=(Boolean)display.get("publication_types");
+        labelShadow=(Boolean)display.get("label_shadow");
+        transparentBg=(Boolean)display.get("transparent");
+        theme=Theme.valueOf((String)display.get("theme"));
+        sizeMode=SizeMode.valueOf((String)display.get("size_mode"));
+        nodeShape=NodeShape.valueOf((String)display.get("shape"));
+        layoutAlgo=LayoutAlgo.valueOf((String)display.get("layout"));
+        labelBudget=(int)MiniJson.num(display.get("label_budget"));
+        labelFontSize=(float)MiniJson.num(display.get("font_size"));
+        labelAngle=(int)MiniJson.num(display.get("label_angle"));
+        nodeScale=(double)MiniJson.num(display.get("node_scale"));
+        linkTransparency=(float)MiniJson.num(display.get("link_opacity"));
+        kcoreHighlight=(int)MiniJson.num(display.get("kcore"));
+        hullFillPattern=(int)MiniJson.num(display.get("fill_pattern"));
+        labelPlacementRate=(int)MiniJson.num(display.get("label_attempts"));
+        fisheyeFocusX=(double)MiniJson.num(display.get("fisheye_x"));
+        fisheyeFocusY=(double)MiniJson.num(display.get("fisheye_y"));
+        fisheyeStrength=(double)MiniJson.num(display.get("fisheye_strength"));
+        clusterLabelBg=display.get("cluster_label_bg")==null?null:new Color(((Number)display.get("cluster_label_bg")).intValue(),true);
+        articleLabelBg=display.get("article_label_bg")==null?null:new Color(((Number)display.get("article_label_bg")).intValue(),true);
+        termLabelBg=display.get("term_label_bg")==null?null:new Color(((Number)display.get("term_label_bg")).intValue(),true);
+        overlayLabelBg=display.get("overlay_label_bg")==null?null:new Color(((Number)display.get("overlay_label_bg")).intValue(),true);
+        title=(String)state.get("title");pos.clear();for(var entry:MiniJson.obj(state.get("positions")).entrySet()){var xy=MiniJson.arr(entry.getValue());pos.put(network.nodes.get(entry.getKey()),new Point2D.Double(MiniJson.num(xy.get(0)),MiniJson.num(xy.get(1))));}
+        bands.clear();for(var entry:MiniJson.obj(state.get("bands")).entrySet()){var span=MiniJson.arr(entry.getValue());bands.put(Integer.parseInt(entry.getKey()),new double[]{MiniJson.num(span.get(0)),MiniJson.num(span.get(1))});}
+        hiddenNodes.clear();for(Object id:MiniJson.arr(state.get("hidden")))hiddenNodes.add(network.nodes.get(id));focusNode=network.nodes.get(state.get("focus"));selectedNode=network.nodes.get(state.get("selected"));expandedNode=network.nodes.get(state.get("expanded"));highlightCluster=((Number)state.get("highlight_cluster")).intValue();yearCutoff=((Number)state.get("year_cutoff")).intValue();
+        highlightIds.clear();for(Object label:MiniJson.arr(state.get("highlights")))highlightIds.add((String)label);overlayKeys.clear();for(Object key:MiniJson.arr(state.get("overlay_keys")))overlayKeys.add((String)key);overlayEdges.clear();for(Object edge:MiniJson.arr(state.get("overlays"))){var ends=MiniJson.arr(edge);overlayEdges.add(new String[]{(String)ends.get(0),(String)ends.get(1)});}paramPanel=new ArrayList<>();for(Object line:MiniJson.arr(state.get("parameter_lines")))paramPanel.add((String)line);
+        var camera=MiniJson.obj(state.get("camera"));cameraScale=MiniJson.num(camera.get("scale"));cameraX=MiniJson.num(camera.get("center_x"));cameraY=MiniJson.num(camera.get("center_y"));customCamera=true;restoredPositions=true;computeRadius();applyCamera();repaint();
+    }
+
+    public void fitToWindow(){customCamera=false;cameraScale=1;cameraX=WORLD_W/2;cameraY=WORLD_H/2;fitView();repaint();}
+    public void showAllNodes(){if(hiddenNodes.isEmpty())return;if(beforeEdit!=null)beforeEdit.run();hiddenNodes.clear();repaint();}
+    public Mode getMode(){return mode;}
+    public void setNodePosition(String id,double x,double y){
+        if(network==null||!network.nodes.containsKey(id)||!pos.containsKey(network.nodes.get(id)))throw new IllegalArgumentException("Node has no position in this view");
+        if(!Double.isFinite(x)||!Double.isFinite(y)||Math.abs(x)>1e6||Math.abs(y)>1e6)throw new IllegalArgumentException("Node position must be finite and bounded");
+        var node=network.nodes.get(id);var previous=pos.get(node);
+        // A time-axis position encodes a year; manual adjustment may only change vertical label spacing.
+        if(mode==Mode.TIMELINE||mode==Mode.TIMEZONE){x=previous.x;double[] band=bands.get(node.cluster);if(band!=null)y=Math.clamp(y,band[0]+8,Math.max(band[0]+8,band[1]-8));else y=Math.clamp(y,45,WORLD_H-45);}
+        pos.put(node,new Point2D.Double(x,y));restoredPositions=true;repaint();
+    }
+    public void setNodeHidden(String id,boolean hidden){if(network==null||!network.nodes.containsKey(id))throw new IllegalArgumentException("Unknown node");if(hidden)hiddenNodes.add(network.nodes.get(id));else hiddenNodes.remove(network.nodes.get(id));repaint();}
 
     public void setClusterLabels(Map<Integer, List<LLRLabeler.Scored>> labels) {
         this.clusterLabels = labels == null ? Collections.emptyMap() : labels;
-        if (mode == Mode.TIMELINE && network != null) computeLayout();
+        if (mode == Mode.TIMELINE && network != null && !restoredPositions) computeLayout();
         repaint();
     }
 
@@ -626,7 +737,7 @@ public final class GraphCanvas extends JPanel {
         if (p != null) {
             zoom = Math.max(zoom, 2.0);
             offX = viewportWidth() / 2.0 - p.x * zoom;
-            offY = viewportHeight() / 2.0 - p.y * zoom;
+            offY = viewportHeight() / 2.0 - p.y * zoom;rememberCamera();
         }
         repaint();
         return true;
@@ -635,7 +746,7 @@ public final class GraphCanvas extends JPanel {
     public Map<Integer, double[]> bandsForTest() { return Collections.unmodifiableMap(bands); }
 
     /** World-space position of a node after layout (for tests). */
-    public Point2D.Double positionOf(GraphNode n) { return pos.get(n); }
+    public Point2D.Double positionOf(GraphNode n) {var point=pos.get(n);return point==null?null:(Point2D.Double)point.clone();}
 
     // ---------- layout ----------
 
@@ -768,8 +879,8 @@ public final class GraphCanvas extends JPanel {
     private Map<Integer, Map<Integer, Integer>> clusterYearActivity() {
         Map<Integer, Map<Integer, Integer>> act = new TreeMap<>();
         if (network == null) return act;
-        for (GraphNode n : network.nodeCollection())
-            for (var e : n.countsByYear.entrySet())
+        for (GraphNode n : visibleNodes())
+            for (var e : n.countsByYear.entrySet())if(e.getKey()<=yearCutoff)
                 act.computeIfAbsent(n.cluster, k -> new TreeMap<>()).merge(e.getKey(), e.getValue(), Integer::sum);
         return act;
     }
@@ -1538,25 +1649,25 @@ public final class GraphCanvas extends JPanel {
                         if (labelShadow) {   // 标签阴影（原版 "Label Shadow" 视觉选项）
                             Color c0 = g.getColor();
                             g.setColor(new Color(0, 0, 0, 90));
-                            g.drawString(ycscite.I18n.text(n.label), (float) (sx + 1), (float) (sy + 14));
+                            g.drawString(n.label, (float) (sx + 1), (float) (sy + 14));
                             g.setColor(c0);
                         }
                         String dispLabel = n.userLabel != null ? n.userLabel : n.label;
                         if (showClusterId) dispLabel = "#" + n.cluster + " " + dispLabel;
                         if (showCitationCount) dispLabel = dispLabel + " (" + n.weight + ")";
-                        g.drawString(ycscite.I18n.text(dispLabel), (float) sx, (float) (sy + 13));
+                        g.drawString(dispLabel, (float) sx, (float) (sy + 13));
                         g.setTransform(labelSaved);
                     } else {
                         if (labelShadow) {
                             Color c0 = g.getColor();
                             g.setColor(new Color(0, 0, 0, 90));
-                            g.drawString(ycscite.I18n.text(n.label), (float) (sx + 1), (float) (sy + 14));
+                            g.drawString(n.label, (float) (sx + 1), (float) (sy + 14));
                             g.setColor(c0);
                         }
                         String dispLabel = n.userLabel != null ? n.userLabel : n.label;
                         if (showClusterId) dispLabel = "#" + n.cluster + " " + dispLabel;
                         if (showCitationCount) dispLabel = dispLabel + " (" + n.weight + ")";
-                        g.drawString(ycscite.I18n.text(dispLabel), (float) sx, (float) (sy + 13));
+                        g.drawString(dispLabel, (float) sx, (float) (sy + 13));
                     }
                 }
             }
@@ -1736,12 +1847,13 @@ public final class GraphCanvas extends JPanel {
     /** Render into an image at a fixed size (headless-safe, for tests, PDF and PNG export). */
     /** SVG 矢量导出（对应原版 "View As SVG"）：白底、聚类配色、按权重节点半径、边按权重。 */
     public void writeSvg(java.nio.file.Path out, int w, int h) throws java.io.IOException {
-        if (network == null || pos.isEmpty()) {
+        if (network == null || pos.isEmpty() || visibleNodes().isEmpty()) {
             java.nio.file.Files.writeString(out,"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\""+w+"\" height=\""+h+"\" viewBox=\"0 0 "+w+" "+h+"\"><rect width=\"100%\" height=\"100%\" fill=\"white\"/><text x=\"60\" y=\"100\" font-size=\"24\">"+ycscite.I18n.text("没有可绘制的数据")+"</text></svg>");
             return;
         }
         double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
-        for (Point2D.Double p : pos.values()) {
+        for (GraphNode node : visibleNodes()) {
+            Point2D.Double p=pos.get(node);if(p==null)continue;
             minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
             minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
         }
@@ -1752,12 +1864,12 @@ public final class GraphCanvas extends JPanel {
         sb.append("<rect width=\"100%\" height=\"100%\" fill=\"white\"/>\n");
         for (GraphEdge e : network.edges) {
             Point2D.Double a = pos.get(e.a), b = pos.get(e.b);
-            if (a == null || b == null) continue;
+            if (a == null || b == null || hiddenNodes.contains(e.a)||hiddenNodes.contains(e.b)||firstYearOf(e.a)>yearCutoff||firstYearOf(e.b)>yearCutoff) continue;
             sb.append(String.format(java.util.Locale.ROOT,"<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#b8c4d0\" stroke-width=\"%.2f\" opacity=\"0.5\"/>%n",
                     40 + (a.x - minX) * s, 40 + (a.y - minY) * s, 40 + (b.x - minX) * s, 40 + (b.y - minY) * s,
                     Math.min(3, 0.5 + 0.3 * e.weight)));
         }
-        for (GraphNode n : network.nodeCollection()) {
+        for (GraphNode n : visibleNodes()) {
             Point2D.Double p = pos.get(n);
             if (p == null) continue;
             double r = radius.getOrDefault(n, 6.0);

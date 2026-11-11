@@ -33,7 +33,7 @@ import java.util.List;
  *   ycscite doctor                                              环境与版本自检
  */
 public final class Cli {
-    public static final String VERSION = "0.3.4";
+    public static final String VERSION = "0.3.5";
 
     public static int run(String[] args) {
         String language=new Parse(args).opt("lang",I18n.isEnglish()?"en":"zh");
@@ -748,6 +748,12 @@ public final class Cli {
         Path out = Path.of(p.opt("out", "ycscite-out"));
         Files.createDirectories(out);
         boolean any = !(png || html || tsv || cit || p.flag("pdf") || p.flag("svg"));
+        if(!b.presentation.isEmpty()||p.hasFlag("view")){
+            var formats=new ArrayList<String>();if(png||any)formats.add("png");if(p.flag("svg"))formats.add("svg");if(p.flag("pdf"))formats.add("pdf");
+            emit(b.result,out,false,html||any,tsv||any,false,false,false,cit,b.project);
+            if(!formats.isEmpty())ProjectExports.dispatch(java.util.Map.of("action","export","path",projFile.toString(),"output",out.toString(),"formats",formats,"view",p.opt("view","saved"),"language",p.opt("lang",java.util.Objects.toString(b.presentation.get("language"),I18n.isEnglish()?"en":"zh")),"logo",exportLogo(p,b.exportLogo==null||b.exportLogo)));
+            return 0;
+        }
         emit(b.result, out, png || any, html || any, tsv || any, p.flag("pdf"), false, false, cit, b.project,false,exportLogo(p,b.exportLogo==null||b.exportLogo));
         if(p.flag("svg")){var canvas=styledCanvas(b.result,b.project,GraphCanvas.Mode.MERGED,false);canvas.writeSvg(out.resolve("network.svg"),2400,1500);Branding.svgVariants(out.resolve("network.svg"),exportLogo(p,b.exportLogo==null||b.exportLogo),2400,1500);}
 

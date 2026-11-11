@@ -40,6 +40,7 @@ public final class Headless {
   return switch(method){
    case "capabilities"->capabilities();
    case "inspect"->inspect(params);
+   case "project"->ProjectExports.dispatch(params);
    case "validate_settings"->new Settings(MiniJson.obj(params.get("settings"))).map();
    case "report","analyze"->{
     var overrides=new LinkedHashMap<>(MiniJson.obj(params.get("settings")));
@@ -91,7 +92,7 @@ public final class Headless {
   formats.put("pubmed","PubMed MEDLINE");formats.put("pubmed-xml","PubMed XML");formats.put("ris","RIS / ProQuest");formats.put("bibtex","BibTeX");
   formats.put("dimensions","Dimensions CSV");formats.put("derwent","Derwent patent TSV");formats.put("kci","KCI CSV/TSV");formats.put("nsf","NSF awards XML");formats.put("records-tsv","Ycscite records TSV");
   var charts=NineFigureReport.FIGURES.stream().map(f->Map.of("key",f.key(),"title_zh",f.title(),"title_en",I18n.english(f.title()),"file",f.file())).toList();
-  var inventory=new LinkedHashMap<String,Object>(Map.of("schema_version",2,"version",Cli.VERSION,"methods",List.of("capabilities","inspect","validate_settings","report","analyze","batch","cli"),"formats",formats,
+  var inventory=new LinkedHashMap<String,Object>(Map.of("schema_version",2,"version",Cli.VERSION,"methods",List.of("capabilities","inspect","validate_settings","report","analyze","project","batch","cli"),"formats",formats,
    "networks",List.of("keyword","term","author","institution","cocitation","coupling","aca","jca","country","category"),
    "charts",charts,"default_settings",Settings.DEFAULTS,"legacy_commands",List.of("analyze","convert","batch","visualize","open","search","openalex","video","sql","doctor"),
    "modules",List.of("centrality","pagerank","burst","modularity","spectral","em","llr","lsi","tfidf","mutual_information","kcore","structural_variation","uncertainty","main_path","thematic_map","dual_map","contours","terms","svo","citation_report","pajek","gexf","ucinet","ris","svg","pdf","docx","sql","project_persistence")));

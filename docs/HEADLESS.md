@@ -17,6 +17,8 @@ The packaged command is `ycscite-cli.exe`; a development build is `native/target
 | `engine <legacy command...> [--json]` | Complete legacy CLI, with captured JSON output if selected |
 | `serve [--port N] [--report DIR] [--no-open]` | Local browser workbench |
 | `desktop` | Windows app window |
+| `project inspect <file.csl-proj>` | Read network, saved-view availability and project identity without GUI |
+| `project export <file.csl-proj> --out DIR [--formats png,svg,pdf,tsv]` | Re-export saved layout/style without recalculating analysis |
 | `workbench [inputs...] [--config JSON] [--lang zh/en]` | Interactive node-editing with shared settings; `--project FILE` restores an editable result |
 
 `report` / `analyze`: `--out`, `--config`, `--lang zh|en`, `--logo` / `--no-logo`, `--charts comma,separated,keys`, `--set key=JSON`, `--network`, `--format`, `--from`, `--to`, `--slice-years`, `--g-index-k`, `--pruning`, `--clustering`, `--labeling`.
@@ -41,7 +43,7 @@ Responses:
 {"id":"bad","ok":false,"error":{"code":"execution_failed","message":"Unknown setting: invalid_key"}}
 ```
 
-Supported methods: `capabilities`, `inspect`, `validate_settings`, `report`, `analyze`, `batch`, `cli`. `batch.params.jobs` contains request objects, not raw parameter objects. Batch result has `jobs`, `succeeded`, and `failed`. Failure in one job does not prevent later jobs from running. Nested batch operation is supported for ordinary local use; do not feed untrusted job files.
+Supported methods: `capabilities`, `inspect`, `validate_settings`, `report`, `analyze`, `project`, `batch`, `cli`. `batch.params.jobs` contains request objects, not raw parameter objects. Batch result has `jobs`, `succeeded`, and `failed`. Failure in one job does not prevent later jobs from running. Nested batch operation is supported for ordinary local use; do not feed untrusted job files.
 
 ```json
 {"id":1,"method":"cli","params":{"arguments":["analyze","D:/papers.txt","--net","keyword","--topn","100","--sva","--cluster-summary","--out","D:/advanced"]}}
@@ -106,3 +108,26 @@ New record-level TSV files carry an eighteenth `YCSCITE_TSV_V2` header column an
 Static PNG/SVG/PDF outputs keep both choices under sibling `with-logo/` and `no-logo/` folders; the named primary file follows the selected preference. PNG variants preserve source RGBA (including transparency), SVG adds only a footer/root-viewport extension, and PDF embeds lossless RGB image streams with aspect-preserving pages. Transparent raster data is composited on white for PDF. Both choices reserve the same footer dimensions so switching never crops chart data. Existing unrelated files in a reused output folder are left alone.
 
 The advanced editor's visual PDF contains the current chart followed by a rasterized, CJK-capable metric summary. SVG is a node/edge overview, not a vector recreation of every specialized chart mode. Empty-data exports create an explanatory image rather than reusing an old file. Video, bibliographic data tables and document summaries are separate output types; these flags cover static PNG/SVG/PDF figures.
+
+## Saved visual state and GUI-free project export
+
+New editor-saved projects contain an optional `presentation` object: schema version, language, selected graph view/sidebar tab and per-view coordinates, display options, filters, camera, selection/highlights and overlay references. It is data only, validated against a deterministic fingerprint of the retained graph (nodes, metrics and undirected weighted edges). Unknown fields, missing positions, invalid values and a layout from a different graph fail with an error before canvas mutation. Report projects also retain validated display defaults such as label/node size and link opacity before a manual layout has been saved. Older projects remain readable and compute a layout when one is absent. No external layout script or executable is loaded.
+
+```powershell
+.\ycscite-cli.exe project inspect "D:\analysis\edited.csl-proj"
+.\ycscite-cli.exe project export "D:\analysis\edited.csl-proj" --out "D:\figures" --formats png,pdf,tsv --view saved --no-logo
+.\ycscite-cli.exe project export "D:\analysis\edited.csl-proj" --out "D:\vectors" --formats svg --view merged --width 2400 --height 1500
+```
+
+`project export` defaults to **one PNG**. `--formats` explicitly chooses `png,svg,pdf,tsv`. `--view saved` restores the selected view (MERGED fallback for an older file); a named view uses its saved layout if present or computes that view's layout. `--lang zh|en` and `--logo` / `--no-logo` override stored choices. `--width` / `--height` default to 1600×1000, range 64–8000 each, at most 40 million pixels. SVG dimensions use the same explicit values. PNG/PDF fit the full figure using the retained positions/style; the camera is restored in the interactive editor. Tables and the PDF metric summary describe the complete analyzed network. SVG respects saved filters in spatial views; heatmaps/landscapes use a separate node/edge overview for SVG.
+
+The output contains `project-export.json` with source-project/graph identity, chosen view, whether a saved view was restored, export geometry, language, logo, complete/visible counts and produced files. This command preserves stored analysis and metrics and does not start windows, a Web service or the original pipeline. Existing `engine open` also restores presentation when the project includes it.
+
+NDJSON uses the same entry point:
+
+```json
+{"id":"project-info","method":"project","params":{"action":"inspect","path":"edited.csl-proj"}}
+{"id":"project-figure","method":"project","params":{"action":"export","path":"edited.csl-proj","output":"figures","view":"saved","formats":["png","pdf"],"logo":false,"width":1600,"height":1000}}
+```
+
+In a request file these paths resolve beside that file, following the existing protocol contract. In a stream they resolve from the process working directory. Invalid requests remain isolated and the next NDJSON line can still run.

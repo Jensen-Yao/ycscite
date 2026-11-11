@@ -134,7 +134,7 @@ public final class NineFigureReport {
   var projectFiles=new ArrayList<Map<String,Object>>();Path projects=Files.createDirectories(out.resolve("projects"));
   for(var entry:results.entrySet()){
    String kind=entry.getKey(),networkKey=kind.equals("authors")?"author":kind.equals("institutions")?"institution":kind.equals("focus")?settings.text("network"):"keyword";
-   String file="projects/"+kind+".csl-proj";ProjectStore.save(out.resolve(file),p,entry.getValue(),settings.pipeline(networkKey),settings.bool("logo"));
+   String file="projects/"+kind+".csl-proj";ProjectStore.saveFromReport(out.resolve(file),p,entry.getValue(),settings.pipeline(networkKey),settings);
    projectFiles.add(Map.of("kind",kind,"file",file,"network",networkKey,"analysis_fingerprint",DataFingerprint.of(p)));
   }
   manifest.put("project_files",projectFiles);

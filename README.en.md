@@ -14,7 +14,7 @@ Features include import diagnostics, 13 named input formats, 10 network types, 3
 
 ## Get started
 
-Download `Ycscite-0.3.4-windows-x64.zip` from Releases and extract the **entire folder**. Launch `Ycscite.exe` or use the browser launcher. Select an individual view and run it; batch export is a separate explicit action. A compact Java 21 runtime is included; the desktop shell uses system Edge WebView2. CLI/headless need neither a browser nor WebView2.
+Download `Ycscite-0.3.5-windows-x64.zip` from Releases and extract the **entire folder**. Launch `Ycscite.exe` or use the browser launcher. Select an individual view and run it; batch export is a separate explicit action. A compact Java 21 runtime is included; the desktop shell uses system Edge WebView2. CLI/headless need neither a browser nor WebView2.
 
 ```powershell
 .\ycscite-cli.exe --json doctor
@@ -53,3 +53,5 @@ The local workspace remembers language, analysis settings, input paths, the acti
 Editable `.csl-proj` files retain the included corpus, full analysis options, exact network and manual annotations. Download the current network as an Editable project or open it in the advanced editor; changed settings are passed to the editor rather than replaced with its older defaults. Versioned record TSV preserves multivalue content and control characters.
 
 Static PNG/SVG/PDF branding is consistent in the app, advanced editor and legacy CLI. Both variants retain the chart body; transparent PNG retains its alpha channel, and PDF uses lossless, aspect-preserving image pages with readable CJK summary labels.
+
+Saved editor projects now retain per-view manual coordinates, styles, filters and camera, with graph-bound validation. Use `project inspect` or `project export --out figures --formats png,pdf` to restore visual results without a GUI or analysis recomputation. The default is one PNG.

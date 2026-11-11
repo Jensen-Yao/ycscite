@@ -20,6 +20,8 @@ import ycscite.io.MySqlStore;
 import ycscite.io.NineFigureReport;
 import ycscite.io.PdfExporter;
 import ycscite.io.ProjectStore;
+import ycscite.io.MiniJson;
+import ycscite.io.ViewState;
 import ycscite.io.PubMedParser;
 import ycscite.io.ScopusCsvParser;
 import ycscite.io.WoSParser;
@@ -40,6 +42,7 @@ public final class MainFrame extends JFrame {
     private Project project;
     private Pipeline.Result result;
     private Pipeline.Options inheritedOptions=new Pipeline.Options();
+    private Pipeline.Options analyzedOptions=new Pipeline.Options();
     private final JComboBox<String> networkKind = new JComboBox<>();
     private final JComboBox<String> clusterAlgo = new JComboBox<>();
     private final JComboBox<String> labelAlgo = new JComboBox<>();
@@ -55,12 +58,12 @@ public final class MainFrame extends JFrame {
     private final JCheckBox hullCheck = new JCheckBox(Strings.get("disp.hull"));
     private final JCheckBox shadowCheck = new JCheckBox(Strings.get("disp.shadow"));
     private final JComboBox<String> shapeBox = new JComboBox<>();
-    private final JSpinner fontSpin = new JSpinner(new SpinnerNumberModel(11, 6, 24, 1));
+    private final JSpinner fontSpin = new JSpinner(new SpinnerNumberModel(11.0, 6.0, 24.0, .5));
     private final JCheckBox linkLabelsCheck = new JCheckBox(Strings.get("disp.linklabels"));
     private final JCheckBox clusterIdCheck = new JCheckBox(Strings.get("disp.clusterid"));
     private final JCheckBox citeCountCheck = new JCheckBox(Strings.get("disp.citecount"));
     private final JCheckBox labelClusterColorCheck = new JCheckBox(Strings.get("disp.labelclustercolor"));
-    private final JSlider rescaleSlider = new JSlider(30, 300, 100);
+    private final JSlider rescaleSlider = new JSlider(25, 400, 100);
     private final JSpinner kcoreSpin = new JSpinner(new SpinnerNumberModel(0, 0, 10, 1));
     private final JCheckBox linkMonoCheck = new JCheckBox(Strings.get("disp.linkmono"));
     private final JComboBox<String> fillPatternBox = new JComboBox<>();
@@ -97,7 +100,10 @@ public final class MainFrame extends JFrame {
     private final InfoPanels.NodeInfoPanel nodeInfo = new InfoPanels.NodeInfoPanel();
     private final InfoPanels.ClusterPanel clusterPanel = new InfoPanels.ClusterPanel(c -> currentCanvas().highlightCluster(c));
     private final JLabel status = new JLabel(Strings.get("status.ready"));
-    private final java.util.Deque<Pipeline.Result> undoStack = new java.util.ArrayDeque<>();
+    private record EditState(Pipeline.Result analysis,Pipeline.Options options,Pipeline.Options controls,Map<String,Object> presentation){}
+    private final java.util.Deque<EditState> undoStack = new java.util.ArrayDeque<>();
+    private Map<String,Object> pendingPresentation=Map.of();
+    private boolean syncingDisplayControls=false;
 
     public MainFrame() {
         super("Ycscite "+ycscite.Cli.VERSION+" · "+Strings.get("app.title"));
@@ -146,9 +152,7 @@ public final class MainFrame extends JFrame {
                  public boolean isCellEditable(int a, int b) { return false; }
             });
         };
-        timeline.setSelectionListener(n -> { nodeInfo.show(n); citingFill.accept(n); });
-        timezone.setSelectionListener(n -> { nodeInfo.show(n); citingFill.accept(n); });
-        merged.setSelectionListener(n -> { nodeInfo.show(n); citingFill.accept(n); });
+        for(var canvas:canvases())canvas.setSelectionListener(n->{nodeInfo.show(n);citingFill.accept(n);});
 
         report.setEditable(false);
         report.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
@@ -163,6 +167,7 @@ public final class MainFrame extends JFrame {
 
         add(tabs, BorderLayout.CENTER);
         add(south, BorderLayout.SOUTH);
+        tabs.addChangeListener(event->{if(result!=null&&!rendering){syncDisplayControls();anim.syncToCanvas();nodeInfo.show(currentCanvas().getSelectedNode());}});
         installShortcuts();
         setSize(1500, 940);
         setLocationRelativeTo(null);
@@ -215,7 +220,7 @@ public final class MainFrame extends JFrame {
             return;
         }
         if (result == null) return;
-        result = undoStack.pop();
+        var previous=undoStack.pop();result=previous.analysis();analyzedOptions=previous.options();syncOptions(previous.controls());pendingPresentation=previous.presentation();
         refresh(project == null ? "network" : project.name + " — " + result.network.kind + " (undo)");
         setStatus(Strings.get("undo") + (Strings.isZh()?" ✓  剩余 ":" ✓  Remaining: ") + undoStack.size() + (Strings.isZh()?" 步":" steps"));
     }
@@ -324,7 +329,7 @@ public final class MainFrame extends JFrame {
     }
 
     private void setTheme(GraphCanvas.Theme t) {
-        for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+        for (GraphCanvas c : canvases())
             c.setTheme(t);
         repaint();
     }
@@ -341,9 +346,9 @@ public final class MainFrame extends JFrame {
     /** 语言切换：静态语言位 + 重建窗口（保留当前数据与结果）。 */
     private void relaunch(Strings.Lang language) {
         if(Strings.getLang()==language)return;
-        var bundle=new ProjectStore.Bundle();bundle.project=project;bundle.result=result;bundle.options=currentOptions();bundle.exportLogo=includeLogo.isSelected();
+        var bundle=new ProjectStore.Bundle();bundle.project=project;bundle.result=result;bundle.options=ycscite.io.PipelineOptionsCodec.copy(analyzedOptions);var pending=currentOptions();bundle.exportLogo=includeLogo.isSelected();bundle.presentation=capturePresentation();
         Strings.setLang(language);
-        SwingUtilities.invokeLater(()->{var frame=new MainFrame();if(bundle.project!=null)frame.setBundle(bundle);frame.setVisible(true);dispose();});
+        SwingUtilities.invokeLater(()->{var frame=new MainFrame();if(bundle.project!=null){frame.setBundle(bundle);frame.syncOptions(pending);}frame.setVisible(true);dispose();});
     }
 
     private String translateNetKind(String old) {
@@ -394,26 +399,26 @@ public final class MainFrame extends JFrame {
                 Strings.get("color.classic"), Strings.get("color.white"),
                 Strings.get("color.yellowbrown"), Strings.get("color.yellowgreen")}));
         colorPreset.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-        colorPreset.addActionListener(e2 -> {
+        colorPreset.addActionListener(e2 -> {if(syncingDisplayControls)return;
             String sel = (String) colorPreset.getSelectedItem();
             boolean isWhite = sel != null && (sel.contains("白底") || sel.contains("White"));
             boolean isYB = sel != null && (sel.contains("黄棕") || sel.contains("Brown"));
             boolean isYG = sel != null && (sel.contains("黄绿") || sel.contains("Green"));
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular}) {
+            for (GraphCanvas c : canvases()) {
                 c.setOriginalStyle(isWhite);
                 c.setConvexHull(!isWhite);
                 if (isYB) c.setLinkColorByCluster(false);
                 if (isYG) c.setLinkColorByCluster(true);
             }
         });
-        layoutAlgo.addActionListener(e -> {
+        layoutAlgo.addActionListener(e -> {if(syncingDisplayControls)return;
             String sel = (String) layoutAlgo.getSelectedItem();
             var algo = sel != null && (sel.contains("Kamada") || sel.contains("KK"))
                     ? GraphCanvas.LayoutAlgo.KAMADA_KAWAI
                     : sel != null && (sel.contains("Force") || sel.contains("力导向"))
                     ? GraphCanvas.LayoutAlgo.FORCE_DIRECTED
                     : GraphCanvas.LayoutAlgo.LINLOG;
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLayoutAlgo(algo);
         });
 
@@ -535,19 +540,20 @@ public final class MainFrame extends JFrame {
 
         // ---------- 显示 ----------
         JPanel disp = vPanel();
+        var fit=new JButton(Strings.get("disp.fit"));fit.addActionListener(event->{currentCanvas().fitToWindow();});disp.add(fit);
+        var allNodes=new JButton(Strings.get("disp.showall"));allNodes.addActionListener(event->{currentCanvas().showAllNodes();});disp.add(allNodes);
+        var moveHelp=new JLabel("<html>"+Strings.get("disp.movehint")+"</html>");moveHelp.setMaximumSize(new Dimension(240,65));moveHelp.setForeground(new Color(105,99,88));disp.add(moveHelp);disp.add(strut());
         disp.add(label(Strings.get("label.budget")));
         labelSlider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
-        labelSlider.addChangeListener(e -> {
+        labelSlider.addChangeListener(e -> {if(syncingDisplayControls)return;
             int v = labelSlider.getValue();
-            timeline.setLabelBudget(v);
-            timezone.setLabelBudget(v);
-            merged.setLabelBudget(v);
+            for(var canvas:canvases())canvas.setLabelBudget(v);
         });
         disp.add(labelSlider);
         disp.add(strut());
         disp.add(label(Strings.get("size.mode")));
         sizeMode.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-        sizeMode.addActionListener(e -> {
+        sizeMode.addActionListener(e -> {if(syncingDisplayControls)return;
             Object sel = sizeMode.getSelectedItem();
             GraphCanvas.SizeMode m = sel == null ? GraphCanvas.SizeMode.FREQ
                     : sel.equals(Strings.get("size.sigma")) ? GraphCanvas.SizeMode.SIGMA
@@ -561,9 +567,7 @@ public final class MainFrame extends JFrame {
                     : sel.equals(Strings.get("size.bias")) ? GraphCanvas.SizeMode.INFO_BIAS
                     : sel.equals(Strings.get("size.uniform")) ? GraphCanvas.SizeMode.UNIFORM
                     : GraphCanvas.SizeMode.FREQ;
-            timeline.setSizeMode(m);
-            timezone.setSizeMode(m);
-            merged.setSizeMode(m);
+            for(var canvas:canvases())canvas.setSizeMode(m);
         });
         disp.add(sizeMode);
         disp.add(strut());
@@ -585,21 +589,21 @@ public final class MainFrame extends JFrame {
         disp.add(strut());
         // 鱼眼 / 凸包 / 标签角度（实时联动所有视图）
         fisheyeCheck.setAlignmentX(0);
-        fisheyeCheck.addActionListener(e -> {
+        fisheyeCheck.addActionListener(e -> {if(syncingDisplayControls)return;
             boolean on = fisheyeCheck.isSelected();
-            timeline.setFisheye(on); timezone.setFisheye(on); merged.setFisheye(on); tsne.setFisheye(on);
+            for(var canvas:canvases())canvas.setFisheye(on);
         });
         disp.add(fisheyeCheck);
         hullCheck.setAlignmentX(0);
-        hullCheck.addActionListener(e -> {
+        hullCheck.addActionListener(e -> {if(syncingDisplayControls)return;
             boolean on = hullCheck.isSelected();
-            timeline.setConvexHull(on); timezone.setConvexHull(on); merged.setConvexHull(on); tsne.setConvexHull(on);
+            for(var canvas:canvases())canvas.setConvexHull(on);
         });
         disp.add(hullCheck);
         shadowCheck.setAlignmentX(0);
-        shadowCheck.addActionListener(e -> {
+        shadowCheck.addActionListener(e -> {if(syncingDisplayControls)return;
             boolean on = shadowCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLabelShadow(on);
         });
         disp.add(shadowCheck);
@@ -607,71 +611,71 @@ public final class MainFrame extends JFrame {
         shapeBox.setModel(new DefaultComboBoxModel<>(new String[]{
                 Strings.get("shape.circle"), Strings.get("shape.diamond"), Strings.get("shape.square")}));
         shapeBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-        shapeBox.addActionListener(e2 -> {
+        shapeBox.addActionListener(e2 -> {if(syncingDisplayControls)return;
             String s = (String) shapeBox.getSelectedItem();
             var sh = s != null && (s.contains("菱") || s.contains("Diamond")) ? GraphCanvas.NodeShape.DIAMOND
                     : s != null && (s.contains("方") && !s.contains("菱") || s.contains("Square")) ? GraphCanvas.NodeShape.SQUARE
                     : GraphCanvas.NodeShape.CIRCLE;
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setNodeShape(sh);
         });
         disp.add(shapeBox);
         disp.add(label(Strings.get("disp.fontsize")));
         fontSpin.setMaximumSize(new Dimension(60, 26));
-        fontSpin.addChangeListener(e2 -> {
+        fontSpin.addChangeListener(e2 -> {if(syncingDisplayControls)return;
             float size = (Float) ((Number) fontSpin.getValue()).floatValue();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLabelFontSize(size);
         });
         disp.add(fontSpin);
         linkLabelsCheck.setAlignmentX(0);
-        linkLabelsCheck.addActionListener(e2 -> {
+        linkLabelsCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = linkLabelsCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLinkLabels(on);
         });
         disp.add(linkLabelsCheck);
         clusterIdCheck.setAlignmentX(0);
-        clusterIdCheck.addActionListener(e2 -> {
+        clusterIdCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = clusterIdCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setShowClusterId(on);
         });
         disp.add(clusterIdCheck);
         citeCountCheck.setAlignmentX(0);
-        citeCountCheck.addActionListener(e2 -> {
+        citeCountCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = citeCountCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setShowCitationCount(on);
         });
         disp.add(citeCountCheck);
         labelClusterColorCheck.setAlignmentX(0);
-        labelClusterColorCheck.addActionListener(e2 -> {
+        labelClusterColorCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = labelClusterColorCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLabelColorByCluster(on);
         });
         disp.add(labelClusterColorCheck);
         disp.add(label(Strings.get("disp.rescale")));
         rescaleSlider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
-        rescaleSlider.addChangeListener(e2 -> {
+        rescaleSlider.addChangeListener(e2 -> {if(syncingDisplayControls)return;
             double s = rescaleSlider.getValue() / 100.0;
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setNodeScale(s);
         });
         disp.add(rescaleSlider);
         disp.add(label(Strings.get("disp.kcore")));
         kcoreSpin.setMaximumSize(new Dimension(50, 26));
-        kcoreSpin.addChangeListener(e2 -> {
+        kcoreSpin.addChangeListener(e2 -> {if(syncingDisplayControls)return;
             int k = (Integer) kcoreSpin.getValue();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setKcoreHighlight(k);
         });
         disp.add(kcoreSpin);
         linkMonoCheck.setAlignmentX(0);
-        linkMonoCheck.addActionListener(e2 -> {
+        linkMonoCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = linkMonoCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLinkSingleColor(on);
         });
         disp.add(linkMonoCheck);
@@ -679,9 +683,9 @@ public final class MainFrame extends JFrame {
         fillPatternBox.setModel(new DefaultComboBoxModel<>(new String[]{
                 Strings.get("fill.solid"), Strings.get("fill.cross"), Strings.get("fill.dots"), Strings.get("fill.horizontal")}));
         fillPatternBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-        fillPatternBox.addActionListener(e2 -> {
+        fillPatternBox.addActionListener(e2 -> {if(syncingDisplayControls)return;
             int idx = fillPatternBox.getSelectedIndex();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setHullFillPattern(idx);
         });
         disp.add(fillPatternBox);
@@ -689,28 +693,28 @@ public final class MainFrame extends JFrame {
         labelBgBtn.addActionListener(e2 -> {
             Color c = JColorChooser.showDialog(MainFrame.this, Strings.get("disp.labelbg"), Color.LIGHT_GRAY);
             if (c != null)
-                for (GraphCanvas gc : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+                for (GraphCanvas gc : canvases())
                     gc.setClusterLabelBg(c);
         });
         disp.add(labelBgBtn);
         curvedCheck.setAlignmentX(0);
-        curvedCheck.addActionListener(e2 -> {
+        curvedCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = curvedCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setCurvedLines(on);
         });
         disp.add(curvedCheck);
         clusterLinkCheck.setAlignmentX(0);
-        clusterLinkCheck.addActionListener(e2 -> {
+        clusterLinkCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = clusterLinkCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setLinkColorByCluster(on);
         });
         disp.add(clusterLinkCheck);
         effects3dCheck.setAlignmentX(0);
-        effects3dCheck.addActionListener(e2 -> {
+        effects3dCheck.addActionListener(e2 -> {if(syncingDisplayControls)return;
             boolean on = effects3dCheck.isSelected();
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setEffects3d(on);
         });
         disp.add(effects3dCheck);
@@ -719,7 +723,7 @@ public final class MainFrame extends JFrame {
         angleBox.setMaximumSize(new Dimension(80, 26));
         angPanel.add(angleBox, BorderLayout.EAST);
         angPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
-        angleBox.addActionListener(e -> {
+        angleBox.addActionListener(e -> {if(syncingDisplayControls)return;
             Integer deg = (Integer) angleBox.getSelectedItem();
             timeline.setLabelAngle(deg); timezone.setLabelAngle(deg);
             merged.setLabelAngle(deg); tsne.setLabelAngle(deg);
@@ -837,7 +841,7 @@ public final class MainFrame extends JFrame {
             java.util.Set<String> labels = new java.util.HashSet<>(
                     java.nio.file.Files.readAllLines(fc.getSelectedFile().toPath(), java.nio.charset.StandardCharsets.UTF_8));
             labels.removeIf(String::isBlank);
-            for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+            for (GraphCanvas c : canvases())
                 c.setHighlightList(labels);
             setStatus((Strings.isZh()?"高亮列表: ":"Highlight list: ") + labels.size());
         } catch (Exception ex) {
@@ -919,10 +923,10 @@ public final class MainFrame extends JFrame {
             return;
         }
         if (result != null) {
-            undoStack.push(ProjectStore.copyAnalysis(result));
+            undoStack.push(new EditState(ProjectStore.copyAnalysis(result),ycscite.io.PipelineOptionsCodec.copy(analyzedOptions),currentOptions(),capturePresentation()));
             int merged = ycscite.analysis.RefVariants.merge(result.network);
             int slices = project == null ? 0 : Math.max(0, project.maxYear - project.minYear + 1);
-            result = Pipeline.reanalyze(result.network, currentOptions(), slices);
+            var options=currentOptions();result = Pipeline.reanalyze(result.network, ycscite.io.PipelineOptionsCodec.copy(options), slices);analyzedOptions=ycscite.io.PipelineOptionsCodec.copy(options);
             refresh(project.name + " — " + result.network.kind + " (variants merged)");
             setStatus(String.format(Strings.get("merge.variants.done"), merged));
         }
@@ -1024,14 +1028,14 @@ public final class MainFrame extends JFrame {
 
     /** Restore the analyzed project as-is; editing starts from the report's nodes and options. */
     public void setBundle(ProjectStore.Bundle bundle) {
-        this.project=bundle.project;syncOptions(bundle.options);if(bundle.exportLogo!=null)includeLogo.setSelected(bundle.exportLogo);
-        if(bundle.result!=null){this.result=bundle.result;undoStack.clear();refresh(project.name+" — "+(Strings.isZh()?netKindZh(result.network.kind):result.network.kind));}
+        this.project=bundle.project;if(bundle.viewDefaults!=null)applySettings(bundle.viewDefaults);syncOptions(bundle.options);pendingPresentation=bundle.presentation;if(bundle.exportLogo!=null)includeLogo.setSelected(bundle.exportLogo);
+        if(bundle.result!=null){this.result=bundle.result;analyzedOptions=ycscite.io.PipelineOptionsCodec.copy(bundle.options);undoStack.clear();refresh(project.name+" — "+(Strings.isZh()?netKindZh(result.network.kind):result.network.kind));}
         else runPipeline();
     }
     public void applySettings(ycscite.Settings settings) {
         syncOptions(settings.pipeline(null));includeLogo.setSelected(settings.bool("logo"));
         labelSlider.setValue(settings.integer("label_budget"));
-        fontSpin.setValue((int)Math.clamp(12*settings.number("label_scale"),6,24));
+        fontSpin.setValue(Math.clamp(12*settings.number("label_scale"),6,24));
         for(GraphCanvas canvas:new GraphCanvas[]{timeline,timezone,merged,tsne,circular,heatmap,landscape,umap,circlePack}){
             canvas.setTheme(GraphCanvas.Theme.LIGHT);canvas.setNodeScale(settings.number("node_scale"));canvas.setLabelBudget(settings.integer("label_budget"));
             canvas.setLabelFontSize((float)(12*settings.number("label_scale")));canvas.setLinkTransparency((float)settings.number("link_opacity"));
@@ -1039,7 +1043,7 @@ public final class MainFrame extends JFrame {
     }
     /** Reproducible diagnostics for the interactive editor, also used by its UI smoke mode. */
     public Map<String,Object> analysisState() {
-        var state=new java.util.LinkedHashMap<String,Object>();state.put("options",ycscite.io.PipelineOptionsCodec.write(currentOptions()));state.put("export_logo",includeLogo.isSelected());
+        var state=new java.util.LinkedHashMap<String,Object>();state.put("options",ycscite.io.PipelineOptionsCodec.write(result==null?currentOptions():analyzedOptions));if(hasPendingAnalysisOptions())state.put("pending_options",ycscite.io.PipelineOptionsCodec.write(currentOptions()));state.put("export_logo",includeLogo.isSelected());if(result!=null&&!rendering)state.put("presentation",capturePresentation());
         if(project!=null){state.put("source_fingerprint",ycscite.io.DataFingerprint.of(project));state.put("records",project.records.size());}
         if(result!=null){state.put("nodes",result.network.nodes.size());state.put("edges",result.network.edges.size());state.put("modularity",result.modularity);}
         return state;
@@ -1047,7 +1051,7 @@ public final class MainFrame extends JFrame {
 
     public void saveDiagnostics(Path folder)throws Exception{
         java.nio.file.Files.writeString(folder.resolve("state.json"),ycscite.io.MiniJson.write(analysisState()));
-        if(project!=null)ProjectStore.save(folder.resolve("analysis.csl-proj"),project,result,currentOptions(),includeLogo.isSelected());
+        if(project!=null)saveEditable(folder.resolve("analysis.csl-proj"));
         if(result!=null)Exporters.writeTables(result.network,result.clusterLabels,folder.resolve("nodes.tsv"),folder.resolve("edges.tsv"));
         if(result!=null)for(String format:new String[]{"png","svg","pdf"})exportVisual(folder.resolve("network."+format),format);
     }
@@ -1069,9 +1073,9 @@ public final class MainFrame extends JFrame {
             toYear.setValue(project.maxYear);
             spanInitialized = true;
         }
-        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));
+        setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));pendingPresentation=Map.of();
         try {
-            result = Pipeline.run(project, currentOptions());
+            var options=currentOptions();result = Pipeline.run(project, ycscite.io.PipelineOptionsCodec.copy(options));analyzedOptions=ycscite.io.PipelineOptionsCodec.copy(options);
         } finally {
             setCursor(java.awt.Cursor.getDefaultCursor());
         }
@@ -1131,7 +1135,7 @@ public final class MainFrame extends JFrame {
     private void networkEdited() {
         if (result == null) return;
         int slices = project == null ? 0 : Math.max(0, project.maxYear - project.minYear + 1);
-        result = Pipeline.reanalyze(result.network, currentOptions(), slices);
+        var options=currentOptions();result = Pipeline.reanalyze(result.network, ycscite.io.PipelineOptionsCodec.copy(options), slices);analyzedOptions=ycscite.io.PipelineOptionsCodec.copy(options);
         String t = (project == null ? "network" : project.name) + " — " + result.network.kind + " (edited)";
         refresh(t);
     }
@@ -1140,6 +1144,7 @@ public final class MainFrame extends JFrame {
         // 布局（LinLog 5000 迭代等）在后台线程执行，避免冻结 EDT（审计 P0-2）
         setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));rendering=true;renderFailure=null;
         final ycscite.analysis.Pipeline.Result res = result;
+        final Map<String,Object> saved=pendingPresentation;pendingPresentation=Map.of();final var savedCanvases=MiniJson.obj(saved.get("canvases"));
         javax.swing.SwingWorker<Void, Void> worker = new javax.swing.SwingWorker<>() {
             @Override
             protected Void doInBackground() {
@@ -1152,7 +1157,7 @@ public final class MainFrame extends JFrame {
                             : c == landscape ? GraphCanvas.Mode.LANDSCAPE
                             : c == umap ? GraphCanvas.Mode.UMAP
                             : c == circlePack ? GraphCanvas.Mode.CIRCLE_PACK
-                            : GraphCanvas.Mode.TSNE, t);
+                            : GraphCanvas.Mode.TSNE, t,savedCanvases.containsKey(modeOf(c).name())?MiniJson.obj(savedCanvases.get(modeOf(c).name())):null);
                 return null;
             }
 
@@ -1166,7 +1171,7 @@ public final class MainFrame extends JFrame {
                     c.setNetworkChanged(MainFrame.this::networkEdited);
                     c.setBeforeEdit(() -> {
                         if (result != null) {
-                            undoStack.push(ProjectStore.copyAnalysis(result));
+                            undoStack.push(new EditState(ProjectStore.copyAnalysis(result),ycscite.io.PipelineOptionsCodec.copy(analyzedOptions),currentOptions(),capturePresentation()));
                             if (undoStack.size() > 12) undoStack.removeLast();
                         }
                     });
@@ -1175,11 +1180,17 @@ public final class MainFrame extends JFrame {
                     c.setConvexHull(hullCheck.isSelected());
                     c.setLabelAngle((Integer) angleBox.getSelectedItem());
                 }
-                for (GraphCanvas c : new GraphCanvas[]{timeline, timezone, merged, tsne, circular})
+                for (GraphCanvas c : canvases())
                     c.setLabelShadow(shadowCheck.isSelected());
                 anim.setRange(res.network);
+                if(!saved.isEmpty()){
+                    for(var canvas:canvases()){var view=savedCanvases.get(canvas.getMode().name());if(view!=null)canvas.restoreState(MiniJson.obj(view));}
+                    for(var canvas:canvases())if(canvas.getMode().name().equals(saved.get("active_view")))tabs.setSelectedComponent(canvas);
+                    if(saved.get("sidebar_tab") instanceof Number side)((JTabbedPane)((BorderLayout)getContentPane().getLayout()).getLayoutComponent(BorderLayout.WEST)).setSelectedIndex(side.intValue());
+                }
+                anim.syncToCanvas();syncDisplayControls();
                 clusterPanel.setData(res.network, res.clusterStats, res.clusterLabels);
-                if (timeline.getSelectedNode() == null) nodeInfo.show(null);
+                nodeInfo.show(currentCanvas().getSelectedNode());
                 // 动态窗口标题：项目名 · 网络类型
                 setTitle("Ycscite "+ycscite.Cli.VERSION+" — " + (project == null ? "" : project.name + " · ")
                         + (Strings.isZh() ? netKindZh(res.network.kind) : res.network.kind));
@@ -1423,8 +1434,8 @@ public final class MainFrame extends JFrame {
         fc.setFileFilter(new FileNameExtensionFilter("Ycscite project", "csl-proj"));
         if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         try {
-            ProjectStore.save(fc.getSelectedFile().toPath(), project, result, currentOptions(),includeLogo.isSelected());
-            JOptionPane.showMessageDialog(this, Strings.get("proj.saved"));
+            saveEditable(fc.getSelectedFile().toPath());
+            JOptionPane.showMessageDialog(this, Strings.get("proj.saved")+(hasPendingAnalysisOptions()?(Strings.isZh()?"\n尚未运行的分析参数更改未应用到当前结果。":"\nPending analysis settings have not been applied to this result."):""));
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, Strings.get("proj.loadfail") + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
@@ -1444,6 +1455,35 @@ public final class MainFrame extends JFrame {
         minLinkStrength.setValue(o.minLinkStrength);largestCC.setValue(o.largestKComponents);minCluster.setValue(o.minClusterSize);singularCheck.setSelected(o.singularKeywords);
         String sourceKey=switch(o.labelSource.toUpperCase(java.util.Locale.ROOT)){case "T"->"src.t";case "A"->"src.a";case "WC"->"src.wc";case "R"->"src.r";case "TKA"->"src.tka";default->"src.k";};labelSource.setSelectedItem(Strings.get(sourceKey));
         spanInitialized=true;
+    }
+
+    private GraphCanvas[] canvases(){return new GraphCanvas[]{timeline,timezone,merged,tsne,circular,heatmap,landscape,umap,circlePack};}
+    private GraphCanvas.Mode modeOf(GraphCanvas canvas){return canvas==timeline?GraphCanvas.Mode.TIMELINE:canvas==timezone?GraphCanvas.Mode.TIMEZONE:canvas==merged?GraphCanvas.Mode.MERGED:canvas==tsne?GraphCanvas.Mode.TSNE:canvas==circular?GraphCanvas.Mode.CIRCULAR:canvas==heatmap?GraphCanvas.Mode.HEATMAP:canvas==landscape?GraphCanvas.Mode.LANDSCAPE:canvas==umap?GraphCanvas.Mode.UMAP:GraphCanvas.Mode.CIRCLE_PACK;}
+    public Map<String,Object> capturePresentation(){
+        if(result==null)return Map.of();var views=new java.util.LinkedHashMap<String,Object>();for(var canvas:canvases())views.put(canvas.getMode().name(),canvas.captureState());
+        return ViewState.editor(Map.of("schema_version",1,"language",Strings.isZh()?"zh":"en","active_view",currentCanvas().getMode().name(),"sidebar_tab",((JTabbedPane)((BorderLayout)getContentPane().getLayout()).getLayoutComponent(BorderLayout.WEST)).getSelectedIndex(),"canvases",views),result.network);
+    }
+    public void saveEditable(Path path)throws java.io.IOException{
+        if(rendering)throw new java.io.IOException(Strings.isZh()?"布局仍在计算，请稍后保存":"Layout is still running; save when it finishes");
+        ProjectStore.save(path,project,result,result==null?currentOptions():analyzedOptions,includeLogo.isSelected(),capturePresentation());
+    }
+    public boolean hasPendingAnalysisOptions(){
+        if(result==null)return false;var actual=ycscite.io.PipelineOptionsCodec.copy(analyzedOptions);var pending=currentOptions();
+        if(project!=null){if(actual.fromYear==0)actual.fromYear=project.minYear;if(pending.fromYear==0)pending.fromYear=project.minYear;if(actual.toYear>=9999)actual.toYear=project.maxYear;if(pending.toYear>=9999)pending.toYear=project.maxYear;}
+        return !ycscite.io.PipelineOptionsCodec.write(actual).equals(ycscite.io.PipelineOptionsCodec.write(pending));
+    }
+    private void syncDisplayControls(){
+        if(result==null)return;var options=MiniJson.obj(currentCanvas().captureState().get("display"));syncingDisplayControls=true;
+        try{
+            labelSlider.setValue(((Number)options.get("label_budget")).intValue());fontSpin.setValue(((Number)options.get("font_size")).doubleValue());
+            fisheyeCheck.setSelected((Boolean)options.get("fisheye"));hullCheck.setSelected((Boolean)options.get("convex_hull"));shadowCheck.setSelected((Boolean)options.get("label_shadow"));
+            linkLabelsCheck.setSelected((Boolean)options.get("link_labels"));clusterIdCheck.setSelected((Boolean)options.get("cluster_ids"));citeCountCheck.setSelected((Boolean)options.get("citation_counts"));labelClusterColorCheck.setSelected((Boolean)options.get("cluster_label_colors"));
+            rescaleSlider.setValue((int)Math.round(MiniJson.num(options.get("node_scale"))*100));kcoreSpin.setValue(((Number)options.get("kcore")).intValue());linkMonoCheck.setSelected((Boolean)options.get("single_color_links"));
+            fillPatternBox.setSelectedIndex(((Number)options.get("fill_pattern")).intValue());curvedCheck.setSelected((Boolean)options.get("curved_links"));clusterLinkCheck.setSelected((Boolean)options.get("cluster_links"));effects3dCheck.setSelected((Boolean)options.get("effects_3d"));Integer angle=((Number)options.get("label_angle")).intValue();boolean listed=false;for(int i=0;i<angleBox.getItemCount();i++)listed|=angleBox.getItemAt(i).equals(angle);if(!listed)angleBox.addItem(angle);angleBox.setSelectedItem(angle);
+            shapeBox.setSelectedItem(Strings.get("shape."+((String)options.get("shape")).toLowerCase(java.util.Locale.ROOT)));
+            String size=switch((String)options.get("size_mode")){case "FREQ"->"freq";case "CENTRALITY"->"centrality";case "DEGREE"->"degree";case "EIGEN"->"eigen";case "PAGERANK"->"pagerank";case "ENTROPY"->"entropy";case "RELATIVE_ENTROPY"->"relent";case "INFO_BIAS"->"bias";case "UNIFORM"->"uniform";default->"sigma";};sizeMode.setSelectedItem(Strings.get("size."+size));
+            layoutAlgo.setSelectedItem(Strings.get("layout."+switch((String)options.get("layout")){case "KAMADA_KAWAI"->"kk";case "FORCE_DIRECTED"->"fd";default->"linlog";}));
+        }finally{syncingDisplayControls=false;}
     }
 
     public void setExportLogo(boolean value){includeLogo.setSelected(value);}

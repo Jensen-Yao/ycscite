@@ -20,3 +20,5 @@ description: 使用本机 Ycscite 按需生成文献分析图或完整九图、�
 输入不会上传外部服务。不要擅自更改原始数据、覆盖用户明确要求保留的报告、上传或发布结果。重复使用同一输出目录会更新报告文件。原版参照仅限用户指定原图，不以历史误操作的截图替代。
 
 `capabilities.version` 与 doctor/manifest 的 engine_version 应一致。`inspect.result.source_fingerprint` 应等于报告的 `source_fingerprint`；参数与源数据身份必须对应。Web/EXE 每次运行建立独立子目录并自动保存工作区；CLI/headless 的 --out 保持实际报告目录语义，显式复用可能更新同名文件。
+
+已有用户手工排版的项目时优先使用 `project inspect <文件>` 核对网络与保存视图，再用 `project export <文件> --out <目录> --formats png,pdf` 重导出；默认单张PNG，按用户明确需要选择格式。该入口不重新筛选/聚类。没有保存布局时会计算所选视图的布局，清单中的 restored_saved_view 可区分。视觉隐藏不删除科学网络，表格仍为完整网络。

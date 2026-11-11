@@ -1,4 +1,4 @@
-# Ycscite0.3.4 · Windows portable / Windows 便携版
+# Ycscite0.3.5 · Windows portable / Windows 便携版
 
 完整解压目录，双击 `Ycscite.exe`。选择数据，查看预检，在上方选中需要的图，点击「运行分析」。一次只生成当前图；批量导出时自行勾选多图。第一次可以点击「使用示例」。左侧可直接调整常用参数，其他设置在「分析设置」中。English 可切换界面和通用图文标签。下载时可切换 Logo 显隐。
 
@@ -27,3 +27,7 @@ Choose Editable project to retain the current network, corpus and complete optio
 高级窗口「导出」页和「文件」菜单提供图片 Logo 选项。PNG、SVG、PDF 均保留两种版本；页脚独立于数据区，透明 PNG 不失去透明度。CLI 可使用 --logo / --no-logo；PDF 图形不拉伸，中文摘要可读。
 
 The advanced editor's Export tab/File menu includes the logo choice. Static PNG/SVG/PDF keep both variants, preserving chart data; transparent PNG remains transparent. Use --logo / --no-logo in CLI exports. PDF pages preserve aspect ratio and CJK labels.
+
+项目现可保留各视图的手动节点位置、显示样式、筛选及镜头。用 `project inspect <文件>` 查看，`project export <文件> --out figures --formats png,pdf` 无界面重导出；默认只生成PNG。高级窗口拖节点调整，拖空白平移，时间视图锁定年份横坐标。
+
+Saved projects retain per-view manual positions, display settings, filters and camera. Use `project inspect <file>` and `project export <file> --out figures --formats png,pdf` without GUI; one PNG is the default. Time-axis views keep year-encoding horizontal positions fixed.

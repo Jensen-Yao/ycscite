@@ -50,3 +50,18 @@ Use the main download-bar toggle or Include logo in visual exports in the advanc
 PNG, network SVG and visual PDF export both variants to `with-logo/` and `no-logo/`; the primary filename follows the selected choice. A separate footer keeps chart data unchanged and the two versions identically sized. PNG preserves original RGBA transparency. PDFs preserve aspect ratio, embed lossless RGB image streams and rasterize the metric summary without replacing CJK labels with question marks. Transparent raster data is composited on white for PDF.
 
 SVG exports nodes, edges and custom labels as a network overview. Use PNG/PDF for the full appearance of a specialized view. Exporting does not reset the editor's existing pan/zoom. CLI/headless support explicit `--logo` / `--no-logo` overrides for both report and legacy/project figure exports. Video and data-table output use separate contracts.
+
+## Retain manual layouts and export again
+
+In the advanced editor, drag a node to move it or drag blank background to pan. Timeline/time-zone nodes allow vertical movement while the year-encoding horizontal position stays fixed. Fit to window restores an overview; Show all nodes restores visual filters without recalculating scientific metrics.
+
+Saving retains final node positions and per-view display settings, filters, year cutoff, highlights, overlays, camera center/relative zoom, selected view and sidebar tab. Reopen, language switch and undo can restore them. A saved layout is validated against its graph identity; corrupted or mismatched state produces a clear error. Older projects remain usable without a saved layout.
+
+```powershell
+.\ycscite-cli.exe project inspect edited.csl-proj
+.\ycscite-cli.exe project export edited.csl-proj --out figures --formats png,pdf --no-logo
+```
+
+The default export is one PNG, with additional formats explicitly selected. This requires neither the original input directory nor an interactive window. PNG/PDF use the full figure with saved coordinates/style; the camera is retained for the editor. Tables and the PDF metric page describe the full analyzed network; visual hiding does not remove data. `project-export.json` states whether a saved view was restored or a layout was computed.
+
+Saved analysis options identify the network that was actually computed. If analysis controls change before another run, saving retains the current result’s actual options and presentation and explains that the pending controls have not been applied. Run analysis to apply them.

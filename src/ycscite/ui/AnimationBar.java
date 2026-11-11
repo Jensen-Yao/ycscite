@@ -18,6 +18,7 @@ public final class AnimationBar extends JPanel {
     private final JLabel yearLabel = new JLabel();
     private Timer timer;
     private int minYear = 0, maxYear = 0;
+    private boolean syncing=false;
 
     public AnimationBar(Supplier<GraphCanvas> canvas) {
         this.canvas = canvas;
@@ -25,7 +26,7 @@ public final class AnimationBar extends JPanel {
         play.addActionListener(e -> toggle());
         year.addChangeListener(e -> {
             GraphCanvas c = canvas.get();
-            if (c != null) c.setYearCutoff(year.getValue());
+            if (c != null&&!syncing) c.setYearCutoff(year.getValue());
             yearLabel.setText(Strings.get("anim.year") + " " + year.getValue());
         });
         year.setPreferredSize(new Dimension(360, 26));
@@ -47,6 +48,9 @@ public final class AnimationBar extends JPanel {
         GraphCanvas c = canvas.get();
         if (c != null) c.setYearCutoff(maxYear);
     }
+
+    /** Display the selected canvas's saved cutoff without changing another canvas. */
+    public void syncToCanvas(){var current=canvas.get();if(current==null||maxYear==0)return;syncing=true;try{year.setValue(Math.clamp(current.getYearCutoff(),minYear,maxYear));yearLabel.setText(Strings.get("anim.year")+" "+year.getValue());}finally{syncing=false;}}
 
     private void toggle() {
         GraphCanvas c = canvas.get();
