@@ -150,7 +150,7 @@ public final class Main {
                 frame.saveDiagnostics(diagnostics);
                 var layout=(java.awt.BorderLayout)frame.getContentPane().getLayout();var west=(javax.swing.JTabbedPane)layout.getLayoutComponent(java.awt.BorderLayout.WEST);west.setSelectedIndex(west.getTabCount()-1);frame.validate();
                 var controls=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);var drawing=controls.createGraphics();frame.paint(drawing);drawing.dispose();javax.imageio.ImageIO.write(controls,"png",diagnostics.resolve("export-controls.png").toFile());
-                west.setSelectedIndex(2);frame.validate();var displayImage=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);var displayGraphics=displayImage.createGraphics();frame.paint(displayGraphics);displayGraphics.dispose();javax.imageio.ImageIO.write(displayImage,"png",diagnostics.resolve("display-controls.png").toFile());
+                west.setSelectedIndex(2);frame.validate();Files.writeString(diagnostics.resolve("display-geometry.json"),ycscite.io.MiniJson.write(frame.displayGeometry()));var displayImage=new java.awt.image.BufferedImage(frame.getWidth(),frame.getHeight(),java.awt.image.BufferedImage.TYPE_INT_RGB);var displayGraphics=displayImage.createGraphics();frame.paint(displayGraphics);displayGraphics.dispose();javax.imageio.ImageIO.write(displayImage,"png",diagnostics.resolve("display-controls.png").toFile());
                 frame.dispose();System.exit(0);
             }catch(Exception error){error.printStackTrace();frame.dispose();System.exit(1);}});capture.start();}
         });

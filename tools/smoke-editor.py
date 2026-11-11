@@ -49,6 +49,10 @@ def main():
             assert back['analysis']['nodes']==project['analysis']['nodes'], [(old['id'],{k:[old.get(k),new.get(k)] for k in old if old.get(k)!=new.get(k)}) for old,new in zip(project['analysis']['nodes'],back['analysis']['nodes']) if old!=new]
             assert back['analysis']['edges']==project['analysis']['edges']
             assert (output/'export-controls.png').is_file()
+            geometry=json.loads((output/'display-geometry.json').read_text(encoding='utf-8'))
+            assert geometry['panel_width'] <= geometry['viewport_width'] and not geometry['horizontal_scroll'],geometry
+            assert all(control['x']>=0 and control['x']+control['width']<=geometry['panel_width'] for control in geometry['controls']),geometry
+
             assert (output/'editor.png').read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
             assert state['export_logo'] is expected_logo and back['exportLogo'] is expected_logo
             for extension in ['png','svg','pdf']:

@@ -540,9 +540,9 @@ public final class MainFrame extends JFrame {
 
         // ---------- 显示 ----------
         JPanel disp = vPanel();
-        var fit=new JButton(Strings.get("disp.fit"));fit.addActionListener(event->{currentCanvas().fitToWindow();});disp.add(fit);
-        var allNodes=new JButton(Strings.get("disp.showall"));allNodes.addActionListener(event->{currentCanvas().showAllNodes();});disp.add(allNodes);
-        var moveHelp=new JLabel("<html>"+Strings.get("disp.movehint")+"</html>");moveHelp.setMaximumSize(new Dimension(240,65));moveHelp.setForeground(new Color(105,99,88));disp.add(moveHelp);disp.add(strut());
+        var fit=new JButton(Strings.get("disp.fit"));fit.setAlignmentX(0);fit.addActionListener(event->{currentCanvas().fitToWindow();});disp.add(fit);
+        var allNodes=new JButton(Strings.get("disp.showall"));allNodes.setAlignmentX(0);allNodes.addActionListener(event->{currentCanvas().showAllNodes();});disp.add(allNodes);
+        var moveHelp=new JTextArea(Strings.get("disp.movehint"));moveHelp.setEditable(false);moveHelp.setLineWrap(true);moveHelp.setWrapStyleWord(true);moveHelp.setOpaque(false);moveHelp.setFont(UIManager.getFont("Label.font"));moveHelp.setAlignmentX(0);moveHelp.setMinimumSize(new Dimension(0,95));moveHelp.setPreferredSize(new Dimension(220,95));moveHelp.setMaximumSize(new Dimension(Integer.MAX_VALUE,95));moveHelp.setForeground(new Color(105,99,88));disp.add(moveHelp);disp.add(strut());
         disp.add(label(Strings.get("label.budget")));
         labelSlider.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         labelSlider.addChangeListener(e -> {if(syncingDisplayControls)return;
@@ -769,14 +769,23 @@ public final class MainFrame extends JFrame {
         return west;
     }
 
+    /** Sidebar columns follow the viewport width and scroll only in the vertical direction. */
+    private static final class SettingsColumn extends JPanel implements Scrollable {
+        public Dimension getPreferredScrollableViewportSize(){return getPreferredSize();}
+        public int getScrollableUnitIncrement(Rectangle visible,int orientation,int direction){return 18;}
+        public int getScrollableBlockIncrement(Rectangle visible,int orientation,int direction){return Math.max(18,visible.height-18);}
+        public boolean getScrollableTracksViewportWidth(){return true;}
+        public boolean getScrollableTracksViewportHeight(){return false;}
+    }
     private JPanel vPanel() {
-        JPanel p = new JPanel();
+        JPanel p = new SettingsColumn();
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         return p;
     }
     private Component strut() { return Box.createVerticalStrut(8); }
     private JScrollPane wrap(JPanel p) {
+        for(Component component:p.getComponents())if(component instanceof JComponent child){child.setAlignmentX(0);if(child instanceof JCheckBox)child.setMaximumSize(new Dimension(Integer.MAX_VALUE,child.getPreferredSize().height));}
         JScrollPane sp = new JScrollPane(p);
         sp.setBorder(null);
         sp.getVerticalScrollBar().setUnitIncrement(18);
@@ -1486,6 +1495,14 @@ public final class MainFrame extends JFrame {
         }finally{syncingDisplayControls=false;}
     }
 
+    public Map<String,Object> displayGeometry(){
+        var west=(JTabbedPane)((BorderLayout)getContentPane().getLayout()).getLayoutComponent(BorderLayout.WEST);var scroll=(JScrollPane)west.getComponentAt(2);var viewport=scroll.getViewport();var panel=(JPanel)viewport.getView();
+        var controls=new java.util.ArrayList<Map<String,Object>>();for(Component component:panel.getComponents())if(!(component instanceof Box.Filler)){
+            var entry=new java.util.LinkedHashMap<String,Object>();entry.put("type",component.getClass().getSimpleName());entry.put("x",component.getX());entry.put("width",component.getWidth());
+            if(component instanceof AbstractButton button)entry.put("label",button.getText());else if(component instanceof JLabel label)entry.put("label",label.getText());controls.add(entry);
+        }
+        return Map.of("viewport_width",viewport.getExtentSize().width,"panel_width",panel.getWidth(),"horizontal_scroll",scroll.getHorizontalScrollBar().isVisible(),"controls",controls);
+    }
     public void setExportLogo(boolean value){includeLogo.setSelected(value);}
     /** Shared by the actual export buttons and the editor integration checks. */
     public void exportVisual(Path path,String format)throws Exception{
